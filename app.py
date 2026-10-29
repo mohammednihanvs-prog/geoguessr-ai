@@ -742,12 +742,8 @@ def apply_user_correction(
     current_locations,
     corrections_list
 ):
-    # Extract image embedding fingerprint
-    inputs = processor(images=image, return_tensors="pt")
-    with torch.no_grad():
-        im_out = model.get_image_features(pixel_values=inputs["pixel_values"])
-        im_raw = im_out.pooler_output if hasattr(im_out, "pooler_output") else im_out
-        img_emb = (im_raw / im_raw.norm(dim=-1, keepdim=True)).cpu().squeeze(0)
+    # Extract image embedding fingerprint using the exact same multi-scale TTA & Adapter as inference
+    img_emb = extract_visual_representation(image).cpu().squeeze(0)
 
     # 1. Register in Visual Correction Cache (prevent duplicate image fingerprints)
     if corrections_list is None:
@@ -755,7 +751,7 @@ def apply_user_correction(
     
     matched_corr_idx = None
     for c_i, c_item in enumerate(corrections_list):
-        c_emb = c_item["embedding"]
+        c_emb = c_item["embedding"].to(img_emb.device)
         cos_sim = torch.dot(img_emb, c_emb).item()
         if cos_sim >= 0.98:  # Same image already recorded
             matched_corr_idx = c_i
@@ -773,20 +769,7 @@ def apply_user_correction(
         })
     torch.save(corrections_list, CORRECTIONS_FILE)
 
-    # 2. Build target text prompt and re-encode
-    target_prompt = (
-        f"a street view photo in {target_location_name.strip()}, {visual_clues}"
-        if visual_clues
-        else f"a street view photo in {target_location_name.strip()}"
-    )
-
-    with torch.no_grad():
-        target_input = processor(text=[target_prompt], return_tensors="pt", padding=True, truncation=True, max_length=77)
-        tx_out = model.get_text_features(input_ids=target_input["input_ids"])
-        tx_raw = tx_out.pooler_output if hasattr(tx_out, "pooler_output") else tx_out
-        updated_text_vec = (tx_raw / tx_raw.norm(dim=-1, keepdim=True)).cpu()
-
-    # 3. Update location index with STRICT DEDUPLICATION
+    # 2. Check if location already exists
     norm_target = target_location_name.strip().lower()
     existing_idx = None
     for idx, loc in enumerate(current_locations):
@@ -794,6 +777,31 @@ def apply_user_correction(
             existing_idx = idx
             break
 
+    # 3. Compute or preserve ensembled text prompt embedding
+    if existing_idx is not None and not visual_clues:
+        # Validating an already-correct place: preserve the rich ensembled embedding and original prompt!
+        updated_text_vec = current_embeddings[existing_idx:existing_idx+1]
+        target_prompt = current_locations[existing_idx].get("prompt", f"a street view photo in {target_location_name.strip()}")
+    else:
+        # When new clues are provided or registering a new place, build a 3-way ensemble (50% visual, 30% canonical, 20% geo)
+        prompt_vis = (
+            f"a street view photo in {target_location_name.strip()}, {visual_clues}"
+            if visual_clues
+            else (current_locations[existing_idx].get("prompt") if existing_idx is not None else f"a street view photo in {target_location_name.strip()}")
+        )
+        prompt_can = f"a street view photo in {target_location_name.strip()}"
+        prompt_geo = f"a photo taken in {target_location_name.strip()}, {country or ''}"
+
+        with torch.no_grad():
+            t_in = processor(text=[prompt_vis, prompt_can, prompt_geo], return_tensors="pt", padding=True, truncation=True, max_length=77)
+            t_out = model.get_text_features(input_ids=t_in["input_ids"])
+            t_raw = t_out.pooler_output if hasattr(t_out, "pooler_output") else t_out
+            t_norm = t_raw / t_raw.norm(dim=-1, keepdim=True)
+            comb_t = 0.50 * t_norm[0:1] + 0.30 * t_norm[1:2] + 0.20 * t_norm[2:3]
+            updated_text_vec = (comb_t / comb_t.norm(dim=-1, keepdim=True)).cpu()
+        target_prompt = prompt_vis
+
+    # 4. Update location index with STRICT DEDUPLICATION
     if existing_idx is not None:
         # UPDATE in-place: guaranteed NO duplicate added
         new_embeddings = current_embeddings.clone()
