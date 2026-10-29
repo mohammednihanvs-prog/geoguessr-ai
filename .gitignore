@@ -1,0 +1,28 @@
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# Large model backups (>100MB exceed GitHub file limit)
+fine_tuned_streetclip_backup.pt
+*backup*.pt
+*.bak
+
+# Windows junctions / duplicates
+img
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test heatmap output
+world_heatmap.html
