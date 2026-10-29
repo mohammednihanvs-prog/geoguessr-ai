@@ -1,5 +1,7 @@
 # 🌍 GeoGuessr AI — Global & Hyper-Local Vision Locator
 
+[![GeoGuessr AI CI Quality Gate](https://github.com/mohammednihanvs-prog/geoguessr-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/mohammednihanvs-prog/geoguessr-ai/actions/workflows/ci.yml)
+
 An AI-powered geographic locator designed to predict exact locations from street view, road, and landscape photos. It can pin down global countries, all 28 Indian States & 8 Union Territories, major cultural hubs, and hyper-local Kerala village micro-regions.
 
 Powered by **StreetCLIP**, a trained **Residual Vision Adapter**, **Multi-Scale Test-Time Augmentation (TTA)**, and active learning memory.
