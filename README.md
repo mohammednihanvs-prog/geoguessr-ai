@@ -10,11 +10,12 @@ Powered by **StreetCLIP**, a trained **Residual Vision Adapter**, **Multi-Scale 
 
 ## 🚀 Key Features
 
-- **Massive Knowledge Base (368+ Canonical Locations across 114+ Countries):**
+- **Massive Knowledge Base (475+ Canonical Locations across 114+ Countries):**
   - **Global (114+ Countries):** Comprehensive world coverage across all 6 inhabited continents (Europe, Americas, Asia, Africa, Oceania) with distinct driving regions, climate zones, and iconic cities.
   - **Pan-India:** Complete coverage of all 28 Indian States & 8 Union Territories plus major cultural centers and tier-1/2 hubs.
-  - **Kerala Micro-Regions:** All 14 districts and dense local village/townscapes (Munnar, Wayanad, Kuttanad, Alappuzha, Fort Kochi, Kovalam, Varkala, Vagamon, Bekal, Athirappilly, Kumarakom, Ponmudi, Munroe Island, Kozhikode, Thrissur, Palakkad, Kannur, Kasaragod, Kollam, Kottayam, etc.).
+  - **Dense Kerala Micro-Regions & Remote Villages (100+ villages across all 14 Districts):** Deep coverage of high-ranges (Vattavada, Kanthalloor, Suryanelli, Chinnakanal, Mankulam, Marayoor, Kolukkumalai), Wayanad hills & forests (Meppadi, Thirunelly, Pulpally, Banasura, Kuruvadweep), Kuttanad & backwaters (Pulinkunnu, Kavalam, Kainakkary, Thakazhy, Edathua, Champakulam), South & Central forests/hills (Gavi, Konni, Thenmala, Arippa, Bonacaud, Ponmudi, Malakkappara, Vazhachal, Ilaveezhapoonchira, Aymanam), Malabar & North Kerala (Kollengode, Attappadi, Karuvarakundu, Kakkadampoyil, Nilambur, Kakkayam, Thusharagiri, Madayipara, Paithalmala, Ranipuram, Kottancheri, Nileshwaram, Badiyadka), and coastal/lagoon heritage (Kumbalangi, Fort Kochi, Varkala, Kovalam, Bekal, Dharmadam).
   - Embedded metadata: Driving sides (`Left` / `Right`), road line colors, soil types, architecture, bollards, poles, and vegetation profiles.
+  - **104 Reference Images Dataset (`Imgs/`):** High-resolution canonical reference street views, village pathways, tea gardens, paddy fields, laterite paths, and authentic random rural road shots.
 
 - **Enhanced Guessing Power, Micro-Clue Fusion & Residual Adapter:**
   - **Multi-Crop Micro-Cue TTA:** 4-crop feature extraction fusing full scene (45%), ground/soil/road lines (25%), roadside infrastructure/poles/bollards (15%), and horizon landscape (15%).
