@@ -56,7 +56,7 @@ def train_adapter(epochs=35, lr=2e-3, bottleneck=256, alpha=0.5):
     # 1. Load cached location embeddings
     print(f"Loading cached text embeddings from '{CACHE_FILE}'...")
     cache_data = torch.load(CACHE_FILE, weights_only=False)
-    text_embeddings = cache_data["embeddings"] # [201, 768]
+    text_embeddings = cache_data["embeddings"] # [N, 768]
     locations = cache_data["locations"]
     print(f"Indexed locations: {len(locations)} with embedding dim: {text_embeddings.shape[1]}")
 
@@ -80,10 +80,11 @@ def train_adapter(epochs=35, lr=2e-3, bottleneck=256, alpha=0.5):
 
     model.eval()
 
-    # Pre-extract normalized image features
-    print("Pre-extracting image representations (caching for fast training)...")
+    # Pre-extract normalized multi-scale TTA image representations
+    print("Pre-extracting Multi-Scale TTA image representations (caching for fast training)...")
     feats_list = []
     targets_list = []
+    weights = [0.60, 0.25, 0.15]
 
     for idx, path in enumerate(image_paths):
         fname = os.path.basename(path)
@@ -91,13 +92,26 @@ def train_adapter(epochs=35, lr=2e-3, bottleneck=256, alpha=0.5):
         
         try:
             im = Image.open(path).convert("RGB")
-            inp = processor(images=im, return_tensors="pt")
+            w, h = im.size
+            crops = [
+                im,
+                im.crop((0, int(h * 0.25), w, h)), # Lower road, soil, markings
+                im.crop((int(w * 0.15), int(h * 0.15), int(w * 0.85), int(h * 0.75))) # Center landscape
+            ]
+
+            crop_feats = []
             with torch.no_grad():
-                out = model.get_image_features(pixel_values=inp["pixel_values"])
-                raw = out.pooler_output if hasattr(out, "pooler_output") else out
-                norm = raw / raw.norm(dim=-1, keepdim=True)
-                feats_list.append(norm.squeeze(0))
-                targets_list.append(loc_idx)
+                for crop in crops:
+                    inp = processor(images=crop, return_tensors="pt")
+                    out = model.get_image_features(pixel_values=inp["pixel_values"])
+                    raw = out.pooler_output if hasattr(out, "pooler_output") else out
+                    norm = raw / raw.norm(dim=-1, keepdim=True)
+                    crop_feats.append(norm)
+
+            fused_feat = sum(w * f for w, f in zip(weights, crop_feats))
+            fused_feat = fused_feat / fused_feat.norm(dim=-1, keepdim=True)
+            feats_list.append(fused_feat.squeeze(0))
+            targets_list.append(loc_idx)
         except Exception as e:
             print(f"  Warning: failed on {fname}: {e}")
 
