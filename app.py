@@ -66,10 +66,13 @@ st.markdown("""
 
     /* Hide Streamlit default chrome & deploy clutter */
     #MainMenu, header, footer, .stDeployButton, div[data-testid="stDecoration"] {
+        display: none !important;
         visibility: hidden !important;
         height: 0 !important;
+        width: 0 !important;
         padding: 0 !important;
         margin: 0 !important;
+        pointer-events: none !important;
     }
 
     /* Apple Ergonomic Page Container Spacing */
@@ -320,19 +323,94 @@ st.markdown("""
         transform: translateY(-1px);
     }
 
-    /* Apple Dropzone for Photos */
+    /* Apple Dropzone & Upload Button */
     [data-testid="stFileUploaderDropzone"] {
         background: var(--apple-surface) !important;
         border: 1.5px dashed #C7C7CC !important;
         border-radius: var(--radius-card) !important;
         box-shadow: var(--shadow-subtle) !important;
         transition: var(--transition-apple) !important;
+        padding: 22px 18px !important;
+        cursor: pointer !important;
     }
 
     [data-testid="stFileUploaderDropzone"]:hover {
         background: var(--apple-surface-hover) !important;
         border-color: var(--apple-blue) !important;
-        box-shadow: 0 4px 18px rgba(0, 113, 227, 0.08) !important;
+        box-shadow: 0 4px 18px rgba(0, 113, 227, 0.10) !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] button,
+    [data-testid="stFileUploader"] button[kind="secondary"] {
+        background: #EBF5FF !important;
+        color: var(--apple-blue) !important;
+        font-family: var(--font-apple) !important;
+        font-weight: 600 !important;
+        font-size: 0.90rem !important;
+        letter-spacing: -0.01em !important;
+        border: 1px solid #CCE4FF !important;
+        border-radius: var(--radius-pill) !important;
+        padding: 9px 24px !important;
+        box-shadow: 0 1px 4px rgba(0, 113, 227, 0.12) !important;
+        transition: var(--transition-apple) !important;
+        cursor: pointer !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] button:hover,
+    [data-testid="stFileUploader"] button[kind="secondary"]:hover {
+        background: var(--apple-blue) !important;
+        color: #FFFFFF !important;
+        border-color: var(--apple-blue) !important;
+        box-shadow: 0 4px 14px rgba(0, 113, 227, 0.35) !important;
+        transform: translateY(-1px) !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] button:active,
+    [data-testid="stFileUploader"] button[kind="secondary"]:active {
+        transform: scale(0.98) !important;
+    }
+
+    [data-testid="stFileUploaderDropzoneInstructions"] {
+        color: var(--apple-text-secondary) !important;
+        font-family: var(--font-apple) !important;
+    }
+
+    [data-testid="stFileUploaderDropzoneInstructions"] span {
+        color: var(--apple-text-primary) !important;
+        font-family: var(--font-apple) !important;
+        font-weight: 500 !important;
+    }
+
+    [data-testid="stFileUploaderDropzoneInstructions"] small {
+        color: var(--apple-text-secondary) !important;
+        font-family: var(--font-apple) !important;
+        font-size: 0.82rem !important;
+    }
+
+    [data-testid="stFileUploaderFile"] {
+        background: #FFFFFF !important;
+        border: 1px solid var(--apple-border) !important;
+        border-radius: 12px !important;
+        padding: 10px 14px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+        margin-top: 8px !important;
+    }
+
+    [data-testid="stFileUploaderDeleteBtn"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 4px !important;
+        color: #86868B !important;
+        border-radius: 50% !important;
+    }
+
+    [data-testid="stFileUploaderDeleteBtn"]:hover {
+        background: #F2F2F7 !important;
+        color: #FF3B30 !important;
     }
 
     /* Apple Vibrant Progress Bars */
@@ -867,13 +945,29 @@ with col_left:
     selected_sample = st.selectbox("Or choose a pre-loaded GeoGuessr challenge photo:", sample_options)
 
     image = None
+    img_source_key = None
     if uploaded_file is not None:
-        image = Image.open(uploaded_file).convert("RGB")
+        try:
+            uploaded_file.seek(0)
+            image = Image.open(uploaded_file).convert("RGB")
+            img_source_key = f"upload_{uploaded_file.name}_{uploaded_file.size}"
+        except Exception:
+            st.error("Could not read uploaded image. Please ensure it is a valid JPG or PNG file.")
+            image = None
     elif selected_sample != "(Upload your own image)":
         clean_filename = selected_sample.split(" ", 1)[1]
         sample_path = os.path.join("Imgs", clean_filename)
         if os.path.exists(sample_path):
             image = Image.open(sample_path).convert("RGB")
+            img_source_key = f"sample_{clean_filename}"
+
+    # Reset stale prediction if active image changed or was removed
+    if st.session_state.get("active_img_source") != img_source_key:
+        st.session_state["active_img_source"] = img_source_key
+        if "ranked" in st.session_state:
+            del st.session_state["ranked"]
+        if "last_image" in st.session_state:
+            del st.session_state["last_image"]
 
     if image is not None:
         st.image(image, caption="Query Photo", use_container_width=True)
@@ -1180,3 +1274,8 @@ with col_right:
                         "action": action_text
                     }
                     st.rerun()
+
+    elif image is not None:
+        st.info("💡 **Photo loaded!** Click **'📍 Geoguess & Analyze Location'** on the left to run multi-scale vision inference.")
+    else:
+        st.caption("Upload an outdoor or street photo or select a pre-loaded challenge sample to begin.")
