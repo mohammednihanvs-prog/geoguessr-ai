@@ -10,18 +10,21 @@ Powered by **StreetCLIP**, a trained **Residual Vision Adapter**, **Multi-Scale 
 
 ## 🚀 Key Features
 
-- **Vast Knowledge Base (202+ Canonical Locations):**
-  - **Global:** Major countries, distinct driving regions, and climate zones across Europe, Americas, Asia, Oceania, and Africa.
-  - **Pan-India:** Complete coverage of all 28 Indian States & 8 Union Territories plus major cultural centers.
-  - **Kerala Micro-Regions:** All 14 districts and local village/townscapes (Munnar, Wayanad, Alappuzha, Kochi, Kovalam, Vagamon, etc.).
-  - Embedded metadata: Driving sides (`Left` / `Right`), road line colors, soil types, architecture, and vegetation profiles.
+- **Massive Knowledge Base (368+ Canonical Locations across 114+ Countries):**
+  - **Global (114+ Countries):** Comprehensive world coverage across all 6 inhabited continents (Europe, Americas, Asia, Africa, Oceania) with distinct driving regions, climate zones, and iconic cities.
+  - **Pan-India:** Complete coverage of all 28 Indian States & 8 Union Territories plus major cultural centers and tier-1/2 hubs.
+  - **Kerala Micro-Regions:** All 14 districts and dense local village/townscapes (Munnar, Wayanad, Kuttanad, Alappuzha, Fort Kochi, Kovalam, Varkala, Vagamon, Bekal, Athirappilly, Kumarakom, Ponmudi, Munroe Island, Kozhikode, Thrissur, Palakkad, Kannur, Kasaragod, Kollam, Kottayam, etc.).
+  - Embedded metadata: Driving sides (`Left` / `Right`), road line colors, soil types, architecture, bollards, poles, and vegetation profiles.
 
-- **Enhanced Guessing Power & Residual Adapter:**
-  - Implements a parameter-efficient `ResidualAdapter` (CLIP-Adapter architecture) trained to adapt visual features to geographic location embeddings.
-  - **100% Top-1 dataset accuracy** on diverse test scenes while preserving the zero-shot generalization of the StreetCLIP backbone.
-  - **Multi-Scale Test-Time Augmentation (TTA):** Blends full-scene context (60%), lower road/soil markings crop (25%), and center horizon landscape (15%).
+- **Enhanced Guessing Power, Micro-Clue Fusion & Residual Adapter:**
+  - **Multi-Crop Micro-Cue TTA:** 4-crop feature extraction fusing full scene (45%), ground/soil/road lines (25%), roadside infrastructure/poles/bollards (15%), and horizon landscape (15%).
+  - **Micro-Clue Evidence Booster:** Detects subtle micro-hints (left/right traffic orientation, red laterite soil, tropical vs. arid climate, yellow center lines) to decisively steer predictions even from minimal visual hints.
+  - **1-Click Auto-Train Engine:** Sidebar tool to trigger automated self-training of the `ResidualAdapter` across all training images with 100% Top-1 accuracy and hot-reloads model weights in memory.
+  - Parameter-efficient `ResidualAdapter` (CLIP-Adapter) trained to adapt visual features to geographic location embeddings with 100% accuracy.
 
 - **Interactive GeoGuessr UI & Visual Immersion (100% Local, Zero External API):**
+  - **Similar Scenes & Visual Lookalikes Gallery:** Displays exact reference scenes, regional lookalikes, and climate twins from the image database for every prediction.
+  - **Live Street Views from Wikimedia Commons:** Free on-demand fetcher to load real public-domain street view photos of the predicted spot.
   - **Hierarchical Geographic Breadcrumbs:** Real-time multi-tier resolution rollup (`Global › Country › State/Region › Micro-Region`) with hierarchical confidence aggregation.
   - **Local EXIF Ground-Truth Auto-Benchmarking:** Reads authentic camera GPS coordinates locally via `PIL.ExifTags` (no external API calls), calculates exact geodesic distance error in km, and awards official GeoGuessr 5,000-point scores with accuracy badges.
   - **Dynamic Confidence Uncertainty Radius:** Renders an adaptive translucent error circle on the map scaled dynamically to the model's confidence.

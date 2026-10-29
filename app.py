@@ -5,6 +5,10 @@ warnings.filterwarnings("ignore", message=".*use_container_width.*")
 
 import os
 import sys
+import glob
+import json
+import urllib.request
+import urllib.parse
 import streamlit as st
 import torch
 import torch.nn as nn
@@ -966,22 +970,197 @@ def find_reference_exemplar(location_name):
         return os.path.join("Imgs", best_img)
     return None
 
-# --- Multi-Scale Test-Time Augmentation (TTA) Feature Extraction ---
+# --- Similar Scenes & Regional Lookalikes Finder ---
+def find_similar_exemplars(target_name, current_locations, img_dir="Imgs", max_results=4):
+    """
+    Finds reference photos and regional lookalikes for the predicted location.
+    Returns list of dicts: [{"path": ..., "caption": ..., "badge": ...}]
+    """
+    if not os.path.exists(img_dir):
+        return []
+
+    target_loc = next((l for l in current_locations if l["name"].strip().lower() == target_name.strip().lower()), None)
+    target_country = target_loc.get("country", "") if target_loc else ""
+    target_region = target_loc.get("region", "") if target_loc else ""
+    target_tokens = set(target_name.lower().replace(",", " ").replace("-", " ").split())
+
+    results = []
+    seen_files = set()
+
+    # Pass 1: Direct landmark matches
+    for fname in os.listdir(img_dir):
+        if not fname.lower().endswith((".jpg", ".jpeg", ".png")):
+            continue
+        clean_fn = fname.lower().replace(".jpg", "").replace(".jpeg", "").replace(".png", "").replace("_", " ").replace("-", " ")
+        fn_tokens = set(clean_fn.split())
+        overlap = len(target_tokens.intersection(fn_tokens))
+        if overlap >= 2:
+            seen_files.add(fname)
+            results.append({
+                "path": os.path.join(img_dir, fname),
+                "caption": fname.replace(".jpg", "").replace("_", " "),
+                "badge": "🎯 Exact Spot",
+                "score": overlap + 10
+            })
+
+    # Pass 2: Regional / State matches
+    if target_region:
+        reg_tokens = set(target_region.lower().replace(",", " ").split())
+        for fname in os.listdir(img_dir):
+            if fname in seen_files or not fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                continue
+            clean_fn = fname.lower().replace(".jpg", "").replace(".jpeg", "").replace(".png", "").replace("_", " ").replace("-", " ")
+            fn_tokens = set(clean_fn.split())
+            if reg_tokens.intersection(fn_tokens):
+                seen_files.add(fname)
+                results.append({
+                    "path": os.path.join(img_dir, fname),
+                    "caption": fname.replace(".jpg", "").replace("_", " "),
+                    "badge": f"📍 Same Region ({target_region})",
+                    "score": 5
+                })
+
+    # Pass 3: Country matches
+    if target_country and len(results) < max_results:
+        country_tokens = set(target_country.lower().replace(",", " ").split())
+        for fname in os.listdir(img_dir):
+            if fname in seen_files or not fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                continue
+            clean_fn = fname.lower().replace(".jpg", "").replace(".jpeg", "").replace(".png", "").replace("_", " ").replace("-", " ")
+            fn_tokens = set(clean_fn.split())
+            if country_tokens.intersection(fn_tokens):
+                seen_files.add(fname)
+                results.append({
+                    "path": os.path.join(img_dir, fname),
+                    "caption": fname.replace(".jpg", "").replace("_", " "),
+                    "badge": f"🚩 Same Country ({target_country})",
+                    "score": 2
+                })
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results[:max_results]
+
+# --- Live Wikimedia Views Fetcher (Free & Open Educational Commons) ---
+def fetch_wikimedia_views(location_name, max_images=3):
+    """
+    Fetches real public-domain street view images from Wikimedia Commons without external API keys.
+    """
+    clean_query = location_name.split(",")[0].strip() + " street view landscape"
+    encoded = urllib.parse.quote(clean_query)
+    api_url = (
+        f"https://commons.wikimedia.org/w/api.php?action=query&generator=search"
+        f"&gsrnamespace=6&gsrsearch={encoded}&gsrlimit={max_images*2}&prop=imageinfo"
+        f"&iiprop=url|mime&iiurlwidth=800&format=json"
+    )
+    req = urllib.request.Request(api_url, headers={"User-Agent": "GeoGuessrAI-AcademicLocator/2.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=4) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        pages = data.get("query", {}).get("pages", {})
+        urls = []
+        for pid, page in pages.items():
+            info = page.get("imageinfo", [{}])[0]
+            thumb = info.get("thumburl") or info.get("url")
+            mime = info.get("mime", "")
+            if thumb and ("image/jpeg" in mime or "image/png" in mime):
+                urls.append({"title": page.get("title", "").replace("File:", "").replace(".jpg", ""), "url": thumb})
+                if len(urls) >= max_images:
+                    break
+        return urls
+    except Exception:
+        return []
+
+# --- Automated Self-Training Engine for Residual Adapter ---
+def run_auto_train(epochs=30, lr=2e-3):
+    """
+    Automated self-training engine for the Residual Vision Adapter.
+    Trains across all local images in Imgs/ against indexed embeddings and updates clip_adapter.pt in-place.
+    Returns (acc_init, acc_final, elapsed_sec).
+    """
+    import time
+    t0 = time.time()
+    extensions = ("*.jpg", "*.jpeg", "*.png")
+    image_paths = []
+    for ext in extensions:
+        image_paths.extend(glob.glob(os.path.join("Imgs", ext)))
+    image_paths = [p for p in image_paths if not os.path.basename(p).startswith("test")]
+
+    feats_list = []
+    targets_list = []
+
+    for path in image_paths:
+        fname = os.path.basename(path)
+        base = os.path.splitext(fname)[0]
+        toks = [t.lower() for t in base.replace("-", "_").split("_") if t]
+        best_idx, best_score = 0, 0
+        for idx, loc in enumerate(locations):
+            score = sum(1 for tok in toks if tok in loc["name"].lower())
+            if score > best_score:
+                best_score = score
+                best_idx = idx
+
+        try:
+            im = Image.open(path).convert("RGB")
+            inp = processor(images=im, return_tensors="pt")
+            with torch.no_grad():
+                out = model.get_image_features(pixel_values=inp["pixel_values"])
+                raw = out.pooler_output if hasattr(out, "pooler_output") else out
+                norm = raw / raw.norm(dim=-1, keepdim=True)
+                feats_list.append(norm.squeeze(0))
+                targets_list.append(best_idx)
+        except Exception:
+            continue
+
+    if not feats_list:
+        return 0.0, 0.0, 0.0
+
+    X = torch.stack(feats_list)
+    Y = torch.tensor(targets_list, dtype=torch.long)
+
+    # Train Residual Adapter
+    new_adapter = ResidualAdapter(dim=X.shape[1], bottleneck=256, alpha=0.5)
+    optimizer = torch.optim.AdamW(new_adapter.parameters(), lr=lr, weight_decay=1e-4)
+    loss_fn = nn.CrossEntropyLoss()
+
+    new_adapter.eval()
+    with torch.no_grad():
+        out_init = new_adapter(X)
+        acc_init = (torch.argmax((out_init @ text_embeddings.T) * 35.0, dim=-1) == Y).float().mean().item() * 100.0
+
+    new_adapter.train()
+    for _ in range(epochs):
+        optimizer.zero_grad()
+        out_feats = new_adapter(X)
+        loss = loss_fn((out_feats @ text_embeddings.T) * 35.0, Y)
+        loss.backward()
+        optimizer.step()
+
+    new_adapter.eval()
+    with torch.no_grad():
+        out_final = new_adapter(X)
+        acc_final = (torch.argmax((out_final @ text_embeddings.T) * 35.0, dim=-1) == Y).float().mean().item() * 100.0
+
+    torch.save(new_adapter.state_dict(), ADAPTER_FILE)
+    elapsed = time.time() - t0
+    return acc_init, acc_final, elapsed
+
+# --- Multi-Scale Test-Time Augmentation (TTA) with Micro-Clue Fusion ---
 def extract_visual_representation(image):
     """
-    Extracts multi-scale visual features:
-    1. Full scene (60% weight)
-    2. Lower road / soil / markings crop (25% weight)
-    3. Center landscape crop (15% weight)
-    Captures both ground-level road cues and horizon architecture.
+    Extracts multi-scale micro-clue visual features:
+    1. Full scene global context (45% weight)
+    2. Lower road / soil / marking crop (bottom 35% - 25% weight: road lines, curb, asphalt, soil)
+    3. Roadside & infrastructure crop (margins - 15% weight: utility poles, bollards, signs, flora)
+    4. Center horizon / landscape crop (15% weight: mountains, skyline, architecture)
     """
     w, h = image.size
     crops = [
         image,
-        image.crop((0, int(h * 0.25), w, h)),
-        image.crop((int(w * 0.1), int(h * 0.1), int(w * 0.9), int(h * 0.9)))
+        image.crop((0, int(h * 0.35), w, h)),                                      # Lower ground/soil/road
+        image.crop((0, int(h * 0.10), int(w * 0.5), int(h * 0.85))),               # Left roadside & infrastructure
+        image.crop((int(w * 0.1), int(h * 0.15), int(w * 0.9), int(h * 0.80)))    # Center horizon
     ]
-    weights = [0.60, 0.25, 0.15]
+    weights = [0.45, 0.25, 0.15, 0.15]
 
     inputs = processor(images=crops, return_tensors="pt")
     with torch.no_grad():
@@ -998,7 +1177,7 @@ def extract_visual_representation(image):
 
     return image_embedding
 
-# --- Prediction Pipeline with Multi-Scale TTA and Visual Memory Matching ---
+# --- Prediction Pipeline with Micro-Clue Evidence Booster & Memory Matching ---
 def predict_location(image, current_embeddings, current_locations, corrections_list=None, category_filter="All"):
     # Filter candidates if requested
     if category_filter != "All":
@@ -1011,10 +1190,10 @@ def predict_location(image, current_embeddings, current_locations, corrections_l
 
     image_embedding = extract_visual_representation(image)
 
-    # Baseline text-image cosine similarities: [1, 768] @ [768, N] -> [N]
+    # 1. Baseline text-image cosine similarities: [1, 768] @ [768, N] -> [N]
     sim_scores = torch.matmul(image_embedding, active_embeddings.T).squeeze(0)
 
-    # Strict Visual Correction Memory Boost (only exact/near-exact image >= 0.92)
+    # 2. Strict Visual Correction Memory Boost (only exact/near-exact image >= 0.92)
     if corrections_list:
         for item in corrections_list:
             corr_emb = item["embedding"].to(image_embedding.device)
@@ -1025,6 +1204,53 @@ def predict_location(image, current_embeddings, current_locations, corrections_l
                     if loc["name"].strip().lower() == corr_target:
                         sim_scores[idx] += (cos_sim - 0.90) * 15.0 + 1.2
                         break
+
+    # 3. Micro-Clue Evidence Booster: Smallest hint makes a decisive impact
+    try:
+        clue_results = detect_geo_clues(image_embedding, clue_cache)
+        clue_map = {c["category"]: (c["label"], c["confidence"]) for c in clue_results}
+
+        # (a) Driving side consistency
+        if "🚗 Traffic Flow Hint" in clue_map:
+            side_label, side_conf = clue_map["🚗 Traffic Flow Hint"]
+            if side_conf >= 0.70:
+                expected_side = "Left" if "left" in side_label.lower() else "Right"
+                for idx, loc in enumerate(active_locations):
+                    loc_side = loc.get("driving_side", "")
+                    if loc_side == expected_side:
+                        sim_scores[idx] += 0.20 * (side_conf - 0.5)
+                    elif loc_side and loc_side != "Unknown":
+                        sim_scores[idx] -= 0.15 * (side_conf - 0.5)
+
+        # (b) Vegetation & Climate Profile Consistency
+        if "🌿 Vegetation & Flora" in clue_map:
+            veg_label, veg_conf = clue_map["🌿 Vegetation & Flora"]
+            if veg_conf >= 0.72:
+                veg_lower = veg_label.lower()
+                for idx, loc in enumerate(active_locations):
+                    p_lower = loc.get("prompt", "").lower()
+                    if "tropical" in veg_lower and ("tropical" in p_lower or "palm" in p_lower or "rainforest" in p_lower or "monsoon" in p_lower):
+                        sim_scores[idx] += 0.25 * (veg_conf - 0.5)
+                    elif "arid" in veg_lower and ("desert" in p_lower or "arid" in p_lower or "sand" in p_lower or "scrub" in p_lower):
+                        sim_scores[idx] += 0.25 * (veg_conf - 0.5)
+                    elif "alpine" in veg_lower and ("alpine" in p_lower or "mountain" in p_lower or "snow" in p_lower or "pine" in p_lower):
+                        sim_scores[idx] += 0.25 * (veg_conf - 0.5)
+
+        # (c) Road Surface Markings Hint
+        if "🛣️ Road & Surface" in clue_map:
+            road_label, road_conf = clue_map["🛣️ Road & Surface"]
+            if road_conf >= 0.75:
+                road_lower = road_label.lower()
+                for idx, loc in enumerate(active_locations):
+                    p_lower = loc.get("prompt", "").lower()
+                    if "yellow" in road_lower and "yellow" in p_lower:
+                        sim_scores[idx] += 0.18 * (road_conf - 0.5)
+                    elif "unpaved" in road_lower and ("dirt" in p_lower or "unpaved" in p_lower or "gravel" in p_lower):
+                        sim_scores[idx] += 0.20 * (road_conf - 0.5)
+                    elif "cobblestone" in road_lower and ("cobblestone" in p_lower or "stone paved" in p_lower):
+                        sim_scores[idx] += 0.20 * (road_conf - 0.5)
+    except Exception:
+        pass
 
     # Scaled softmax for clean confidence distribution
     probabilities = torch.softmax(sim_scores * 35.0, dim=-1).tolist()
@@ -1212,6 +1438,16 @@ with st.sidebar:
         "India - City/Hub": "India - City/Hub"
     }
     selected_scope = scope_mapping[scope_choice]
+
+    st.divider()
+    st.markdown("### 🧠 Auto-Train Engine")
+    st.caption("Continuously fine-tune the Residual Vision Adapter across all local training exemplars:")
+    if st.button("🚀 Trigger Auto-Train", use_container_width=True):
+        with st.spinner("Running automated Residual Vision Adapter training across dataset..."):
+            acc_init, acc_final, elapsed = run_auto_train(epochs=35)
+            st.success(f"🎉 **Auto-Train Complete!**\n\nAccuracy: **{acc_final:.1f}%** (was {acc_init:.1f}%)\n\nTime: {elapsed:.1f}s")
+            st.cache_resource.clear()
+            st.rerun()
 
     st.divider()
     st.markdown("### 🗺️ Satellite & Earth Meta")
@@ -1588,6 +1824,35 @@ with col_right:
             with c_ref:
                 ref_im = Image.open(ref_image_path).convert("RGB")
                 st.image(ref_im, caption=f"Ground-Truth Reference: {os.path.basename(ref_image_path).replace('_', ' ').replace('.jpg', '')}", use_container_width=True)
+
+        # Similar Scenes & Regional Lookalikes Gallery
+        similar_items = find_similar_exemplars(top_pick["name"], locations, img_dir="Imgs", max_results=4)
+        if similar_items:
+            st.markdown("#### 🏞️ Similar Scenes & Visual Lookalikes")
+            st.caption("Visually similar scenes and regional exemplars from the location database:")
+            sim_cols = st.columns(min(4, len(similar_items)))
+            for s_i, s_item in enumerate(similar_items):
+                with sim_cols[s_i % len(sim_cols)]:
+                    try:
+                        s_im = Image.open(s_item["path"]).convert("RGB")
+                        st.image(s_im, caption=s_item["caption"][:26], use_container_width=True)
+                        st.markdown(f"<span class='clue-badge' style='font-size:0.72rem; padding:3px 8px; margin:0;'>{s_item['badge']}</span>", unsafe_allow_html=True)
+                    except Exception:
+                        pass
+
+        # Live Public Street Views from Wikimedia Commons
+        with st.expander(f"🌐 Fetch Live Public Street Views for '{top_pick['name'].split(',')[0]}'", expanded=False):
+            st.caption(f"Fetch real public-domain street and landscape views from Wikimedia Commons (100% free, zero API key):")
+            if st.button("🔍 Search & Fetch Live Photos", key=f"fetch_wiki_{top_pick['name']}"):
+                with st.spinner("Fetching photos from Wikimedia Commons..."):
+                    wiki_results = fetch_wikimedia_views(top_pick["name"], max_images=3)
+                    if wiki_results:
+                        w_cols = st.columns(len(wiki_results))
+                        for w_i, w_item in enumerate(wiki_results):
+                            with w_cols[w_i]:
+                                st.image(w_item["url"], caption=w_item["title"][:28], use_container_width=True)
+                    else:
+                        st.info("No additional Wikimedia street views found for this specific query.")
 
         # Top 5 Candidates List with Direct Maps/Earth shortcuts
         st.markdown("#### 🏆 Top Ranked Candidates")
