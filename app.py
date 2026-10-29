@@ -64,6 +64,24 @@ st.markdown("""
         -moz-osx-font-smoothing: grayscale;
     }
 
+    /* Hide Streamlit default chrome & deploy clutter */
+    #MainMenu, header, footer, .stDeployButton, div[data-testid="stDecoration"] {
+        visibility: hidden !important;
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Apple Ergonomic Page Container Spacing */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 4rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+        max-width: 1280px !important;
+        margin: 0 auto !important;
+    }
+
     /* Apple SF Pro Typography System */
     h1, h2, h3, h4, h5, h6 {
         font-family: var(--font-apple) !important;
@@ -81,6 +99,12 @@ st.markdown("""
         font-family: var(--font-mono) !important;
     }
 
+    /* Text Selection Highlight (Apple Translucent Blue) */
+    ::selection {
+        background: rgba(0, 113, 227, 0.2) !important;
+        color: #1D1D1F !important;
+    }
+
     /* Apple Signature Title Header */
     .main-header {
         font-family: var(--font-apple);
@@ -93,6 +117,15 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         margin-bottom: 0.3rem;
         display: inline-block;
+    }
+
+    .main-subtitle {
+        font-family: var(--font-apple) !important;
+        font-size: 1.05rem !important;
+        color: var(--apple-text-tertiary) !important;
+        line-height: 1.55 !important;
+        margin-top: -0.1rem !important;
+        margin-bottom: 1.6rem !important;
     }
 
     /* Clean Bright Sidebar with macOS Glass Frost */
@@ -234,6 +267,59 @@ st.markdown("""
         border-color: #B0B0B8 !important;
     }
 
+    div[data-baseweb="select"] > div {
+        background: #FFFFFF !important;
+        color: #1D1D1F !important;
+        border-radius: var(--radius-sm) !important;
+    }
+
+    /* BaseWeb Popover Menus & Dropdown Options */
+    div[data-baseweb="popover"],
+    div[data-baseweb="menu"],
+    ul[role="listbox"] {
+        background: #FFFFFF !important;
+        border-radius: 12px !important;
+        border: 1px solid #E5E5EA !important;
+        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.12) !important;
+        color: #1D1D1F !important;
+        padding: 6px !important;
+    }
+
+    li[role="option"] {
+        background: #FFFFFF !important;
+        color: #1D1D1F !important;
+        font-family: var(--font-apple) !important;
+        font-size: 0.92rem !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
+        margin-bottom: 2px !important;
+        transition: var(--transition-apple) !important;
+    }
+
+    li[role="option"]:hover,
+    li[role="option"][aria-selected="true"] {
+        background: #F0F6FE !important;
+        color: #0071E3 !important;
+        font-weight: 500 !important;
+    }
+
+    /* Apple Squircle Border Containers */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: var(--apple-surface) !important;
+        border: 1px solid var(--apple-border) !important;
+        border-radius: 14px !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03) !important;
+        padding: 14px 18px !important;
+        margin-bottom: 12px !important;
+        transition: var(--transition-apple) !important;
+    }
+
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        border-color: #D2D2D7 !important;
+        box-shadow: var(--shadow-card) !important;
+        transform: translateY(-1px);
+    }
+
     /* Apple Dropzone for Photos */
     [data-testid="stFileUploaderDropzone"] {
         background: var(--apple-surface) !important;
@@ -311,13 +397,15 @@ st.markdown("""
     iframe {
         border-radius: var(--radius-card) !important;
         border: 1px solid var(--apple-border) !important;
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+        width: 100% !important;
+        display: block !important;
         transition: var(--transition-apple);
     }
 
     iframe:hover {
         border-color: #C7C7CC !important;
-        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.09) !important;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.09) !important;
     }
 
     /* Image Element Frame */
@@ -335,7 +423,15 @@ st.markdown("""
         margin: 24px 0 !important;
     }
 
-    /* Radio Buttons */
+    /* Radio Buttons in Card Group */
+    div[data-testid="stRadio"] > div {
+        background: #FFFFFF !important;
+        border: 1px solid #E5E5EA !important;
+        border-radius: 12px !important;
+        padding: 8px 14px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+    }
+
     div[data-testid="stRadio"] label {
         font-family: var(--font-apple);
         font-size: 0.92rem;
@@ -345,6 +441,11 @@ st.markdown("""
 
     div[data-testid="stRadio"] label:hover {
         color: var(--apple-blue) !important;
+    }
+
+    /* Spinner */
+    [data-testid="stSpinner"] > div {
+        border-top-color: var(--apple-blue) !important;
     }
 
     /* Accessibility */
@@ -679,7 +780,7 @@ with st.sidebar:
 
 # --- Main Page Header ---
 st.markdown("<h1 class='main-header'>🌍 Global & Hyper-Local GeoGuessr AI</h1>", unsafe_allow_html=True)
-st.markdown("Pins street view and outdoor landscape photos down to **exact global countries, Indian states, and Kerala village micro-regions** using multi-scale vision AI and satellite telemetry.")
+st.markdown("<p class='main-subtitle'>Pins street view and outdoor landscape photos down to <b>exact global countries, Indian states, and Kerala village micro-regions</b> using multi-scale vision AI and satellite telemetry.</p>", unsafe_allow_html=True)
 
 # Show correction success alert if just updated
 if "just_corrected" in st.session_state:
@@ -861,7 +962,7 @@ with col_right:
             ).add_to(m)
 
         folium.LayerControl(position="topright").add_to(m)
-        st_folium(m, width=650, height=380)
+        st_folium(m, use_container_width=True, height=400)
 
         # GeoGuessr Clues Inspector
         st.markdown("#### 🕵️ GeoGuessr Detective Breakdown")
@@ -877,17 +978,18 @@ with col_right:
         # Top 5 Candidates List with Direct Maps/Earth shortcuts
         st.markdown("#### 🏆 Top Ranked Candidates")
         for i, item in enumerate(ranked[:5], start=1):
-            col_rank, col_bar = st.columns([3, 2])
-            item_gmaps, item_earth, _ = get_map_urls(item["lat"], item["lon"])
-            with col_rank:
-                st.write(f"**{i}. {item['name']}**")
-                st.caption(
-                    f"`{item['category']}` | 🚗 `{item['driving_side']}` | "
-                    f"[Maps]({item_gmaps}) · [Earth]({item_earth})"
-                )
-            with col_bar:
-                st.progress(min(1.0, float(item['confidence'] * 2.0)))
-                st.caption(f"**{item['confidence']*100:.2f}%**")
+            with st.container(border=True):
+                col_rank, col_bar = st.columns([3, 2])
+                item_gmaps, item_earth, _ = get_map_urls(item["lat"], item["lon"])
+                with col_rank:
+                    st.write(f"**{i}. {item['name']}**")
+                    st.caption(
+                        f"`{item['category']}` | 🚗 `{item['driving_side']}` | "
+                        f"[Maps]({item_gmaps}) · [Earth]({item_earth})"
+                    )
+                with col_bar:
+                    st.progress(min(1.0, float(item['confidence'] * 2.0)))
+                    st.caption(f"**{item['confidence']*100:.2f}%**")
 
         # Feedback & Active Retraining
         st.divider()
