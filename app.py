@@ -25,36 +25,356 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for modern GeoGuessr styling
+# High-End Futuristic Dark UI Design System (Linear / Raycast / Vision Pro Aesthetic)
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700;800&display=swap');
+
+    :root {
+        --bg-base: #06080F;
+        --bg-surface: rgba(13, 17, 28, 0.72);
+        --bg-surface-elevated: rgba(20, 27, 45, 0.85);
+        --bg-card: rgba(15, 20, 34, 0.65);
+        --bg-glass: rgba(10, 14, 24, 0.82);
+        --border-glass: rgba(255, 255, 255, 0.08);
+        --border-glow: rgba(0, 229, 255, 0.35);
+        --accent-cyan: #00E5FF;
+        --accent-blue: #0070F3;
+        --accent-violet: #7928CA;
+        --accent-emerald: #00F5A0;
+        --text-primary: #F8FAFC;
+        --text-secondary: #94A3B8;
+        --text-muted: #64748B;
+        --font-head: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+        --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
+        --radius-card: 14px;
+        --radius-sm: 8px;
+        --radius-pill: 9999px;
+        --glow-cyan: 0 0 25px rgba(0, 229, 255, 0.25);
+        --glow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+        --glow-card-hover: 0 16px 40px -10px rgba(0, 229, 255, 0.2), 0 0 1px 1px rgba(0, 229, 255, 0.45);
+        --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Base Body & Ambient Sci-Fi Background */
+    .stApp {
+        background-color: var(--bg-base);
+        background-image: 
+            radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.09) 0%, transparent 45%),
+            radial-gradient(circle at 85% 25%, rgba(121, 40, 202, 0.08) 0%, transparent 40%),
+            radial-gradient(circle at 15% 75%, rgba(0, 245, 160, 0.05) 0%, transparent 45%),
+            linear-gradient(rgba(255, 255, 255, 0.016) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px);
+        background-size: 100% 100%, 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+        color: var(--text-primary);
+        font-family: var(--font-body);
+    }
+
+    /* Typography */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-head) !important;
+        letter-spacing: -0.025em;
+        font-weight: 700;
+        color: var(--text-primary) !important;
+    }
+
+    p, span, div, label {
+        font-family: var(--font-body);
+    }
+
+    code, kbd, samp, pre {
+        font-family: var(--font-mono) !important;
+    }
+
+    /* Futuristic Header with Neon Underglow */
     .main-header {
-        font-size: 2.2rem;
+        font-family: var(--font-head);
+        font-size: 2.5rem;
         font-weight: 800;
-        background: linear-gradient(135deg, #1E88E5 0%, #1565C0 100%);
+        letter-spacing: -0.035em;
+        background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 30%, #00E5FF 70%, #0070F3 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: 0.2rem;
-    }
-    .metric-card {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 12px 16px;
-        border-left: 4px solid #1E88E5;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-    .clue-badge {
+        margin-bottom: 0.3rem;
         display: inline-block;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 0.82rem;
-        font-weight: 600;
-        margin-right: 6px;
-        margin-bottom: 6px;
+        filter: drop-shadow(0 2px 18px rgba(0, 229, 255, 0.3));
     }
-    .badge-left { background-color: #E3F2FD; color: #1565C0; }
-    .badge-right { background-color: #FFF3E0; color: #E65100; }
-    .badge-cat { background-color: #EDE7F6; color: #512DA8; }
+
+    /* Glassmorphic Sidebar */
+    [data-testid="stSidebar"] {
+        background: var(--bg-glass) !important;
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border-right: 1px solid var(--border-glass) !important;
+    }
+
+    [data-testid="stSidebar"] hr {
+        border: none !important;
+        height: 1px !important;
+        background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.12) 50%, transparent 100%) !important;
+    }
+
+    /* Glassmorphic Metric Cards */
+    [data-testid="stMetric"] {
+        background: var(--bg-card) !important;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--border-glass) !important;
+        border-radius: var(--radius-card) !important;
+        padding: 14px 18px !important;
+        box-shadow: var(--glow-card);
+        transition: var(--transition-smooth);
+    }
+
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
+        border-color: var(--border-glow) !important;
+        box-shadow: var(--glow-card-hover);
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-family: var(--font-mono) !important;
+        font-size: 0.78rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-secondary) !important;
+    }
+
+    [data-testid="stMetricValue"] {
+        font-family: var(--font-head) !important;
+        font-size: 1.45rem !important;
+        font-weight: 700 !important;
+        color: var(--accent-cyan) !important;
+        text-shadow: 0 0 16px rgba(0, 229, 255, 0.3);
+    }
+
+    /* Futuristic Primary Buttons (Neon Cyan to Blue Gradient) */
+    .stButton button[kind="primary"] {
+        background: linear-gradient(135deg, #00E5FF 0%, #0070F3 60%, #7928CA 100%) !important;
+        color: #040814 !important;
+        font-family: var(--font-head) !important;
+        font-weight: 700 !important;
+        font-size: 0.95rem !important;
+        letter-spacing: -0.01em;
+        border: none !important;
+        border-radius: var(--radius-sm) !important;
+        padding: 12px 24px !important;
+        box-shadow: 0 4px 22px rgba(0, 229, 255, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
+        transition: var(--transition-smooth) !important;
+    }
+
+    .stButton button[kind="primary"]:hover {
+        transform: translateY(-2px) scale(1.008) !important;
+        box-shadow: 0 8px 32px rgba(0, 229, 255, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.6) !important;
+        color: #000000 !important;
+    }
+
+    /* Secondary Glass Buttons */
+    .stButton button[kind="secondary"] {
+        background: rgba(18, 24, 38, 0.72) !important;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        color: #F1F5F9 !important;
+        font-family: var(--font-head) !important;
+        font-weight: 600 !important;
+        border: 1px solid var(--border-glass) !important;
+        border-radius: var(--radius-sm) !important;
+        transition: var(--transition-smooth) !important;
+    }
+
+    .stButton button[kind="secondary"]:hover {
+        background: rgba(26, 36, 58, 0.85) !important;
+        border-color: var(--accent-cyan) !important;
+        color: var(--accent-cyan) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: var(--glow-cyan) !important;
+    }
+
+    /* Link Action Buttons (Google Maps / Earth / Street View) */
+    .stLinkButton a {
+        background: rgba(15, 21, 35, 0.8) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: var(--radius-sm) !important;
+        color: var(--text-primary) !important;
+        font-family: var(--font-head) !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        transition: var(--transition-smooth) !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    .stLinkButton a:hover {
+        border-color: var(--accent-cyan) !important;
+        color: var(--accent-cyan) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 22px rgba(0, 229, 255, 0.28) !important;
+    }
+
+    /* Inputs, Selectboxes & Dropdowns */
+    .stTextInput input {
+        background: rgba(11, 15, 26, 0.8) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: var(--radius-sm) !important;
+        color: #F8FAFC !important;
+        font-family: var(--font-body) !important;
+        transition: var(--transition-smooth) !important;
+    }
+
+    .stTextInput input:focus {
+        border-color: var(--accent-cyan) !important;
+        box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.25) !important;
+        outline: none !important;
+    }
+
+    div[data-baseweb="select"] {
+        background: rgba(11, 15, 26, 0.8) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: var(--radius-sm) !important;
+        transition: var(--transition-smooth) !important;
+    }
+
+    div[data-baseweb="select"]:hover {
+        border-color: rgba(0, 229, 255, 0.4) !important;
+    }
+
+    /* File Uploader Dropzone */
+    [data-testid="stFileUploaderDropzone"] {
+        background: rgba(13, 18, 30, 0.5) !important;
+        backdrop-filter: blur(14px) !important;
+        -webkit-backdrop-filter: blur(14px) !important;
+        border: 1.5px dashed rgba(0, 229, 255, 0.25) !important;
+        border-radius: var(--radius-card) !important;
+        transition: var(--transition-smooth) !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"]:hover {
+        background: rgba(18, 25, 42, 0.72) !important;
+        border-color: var(--accent-cyan) !important;
+        box-shadow: 0 0 28px rgba(0, 229, 255, 0.16) !important;
+    }
+
+    /* Neon Progress Bars */
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #00E5FF 0%, #0070F3 50%, #7928CA 100%) !important;
+        box-shadow: 0 0 14px rgba(0, 229, 255, 0.4) !important;
+        border-radius: var(--radius-pill) !important;
+    }
+
+    .stProgress > div > div > div {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-radius: var(--radius-pill) !important;
+    }
+
+    /* Notifications & Alert Cards */
+    .stAlert, div[data-testid="stNotification"] {
+        background: var(--bg-card) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid var(--border-glass) !important;
+        border-left: 4px solid var(--accent-cyan) !important;
+        border-radius: var(--radius-sm) !important;
+        color: var(--text-primary) !important;
+        box-shadow: var(--glow-card) !important;
+    }
+
+    /* Custom Futuristic Badges */
+    .clue-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 12px;
+        border-radius: var(--radius-pill);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        font-weight: 600;
+        margin-right: 8px;
+        margin-bottom: 8px;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        transition: var(--transition-smooth);
+        letter-spacing: 0.02em;
+    }
+
+    .clue-badge:hover {
+        transform: translateY(-1px);
+    }
+
+    .badge-left {
+        background: rgba(0, 229, 255, 0.1);
+        color: #38BDF8;
+        border: 1px solid rgba(0, 229, 255, 0.3);
+        box-shadow: 0 0 12px rgba(0, 229, 255, 0.15);
+    }
+
+    .badge-right {
+        background: rgba(251, 146, 60, 0.1);
+        color: #FB923C;
+        border: 1px solid rgba(251, 146, 60, 0.3);
+        box-shadow: 0 0 12px rgba(251, 146, 60, 0.15);
+    }
+
+    .badge-cat {
+        background: rgba(168, 85, 247, 0.1);
+        color: #C084FC;
+        border: 1px solid rgba(168, 85, 247, 0.3);
+        box-shadow: 0 0 12px rgba(168, 85, 247, 0.15);
+    }
+
+    /* Folium Map Container Frame */
+    iframe {
+        border-radius: var(--radius-card) !important;
+        border: 1px solid rgba(0, 229, 255, 0.22) !important;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 229, 255, 0.1) !important;
+        transition: var(--transition-smooth);
+    }
+
+    iframe:hover {
+        border-color: rgba(0, 229, 255, 0.45) !important;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 229, 255, 0.2) !important;
+    }
+
+    /* Image Element Frame */
+    [data-testid="stImage"] img {
+        border-radius: var(--radius-card) !important;
+        border: 1px solid var(--border-glass) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+    }
+
+    /* Dividers with Gradient Glow */
+    hr {
+        border: none !important;
+        height: 1px !important;
+        background: linear-gradient(90deg, transparent 0%, rgba(0, 229, 255, 0.25) 50%, transparent 100%) !important;
+        margin: 28px 0 !important;
+    }
+
+    /* Radio Buttons */
+    div[data-testid="stRadio"] label {
+        font-family: var(--font-body);
+        font-size: 0.92rem;
+        color: var(--text-primary) !important;
+        transition: var(--transition-smooth);
+    }
+
+    div[data-testid="stRadio"] label:hover {
+        color: var(--accent-cyan) !important;
+    }
+
+    /* Accessibility: Respect Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -543,13 +863,13 @@ with col_right:
             m_gmaps, m_earth, _ = get_map_urls(item["lat"], item["lon"])
             
             popup_html = f"""
-            <div style='font-family:sans-serif; min-width:200px;'>
-                <b style='font-size:13px; color:#1a73e8;'>#{i} {item['name']}</b><br/>
-                <span style='color:#555;'>Confidence: <b>{item['confidence']*100:.1f}%</b></span><br/>
-                <span>Driving: <b>{item['driving_side']}</b></span><br/>
-                <hr style='margin:6px 0;'/>
-                <a href='{m_gmaps}' target='_blank' style='color:#1a73e8; font-weight:bold; margin-right:8px;'>📍 Google Maps</a>
-                <a href='{m_earth}' target='_blank' style='color:#0d652d; font-weight:bold;'>🌐 Google Earth</a>
+            <div style='font-family:Inter,-apple-system,sans-serif; min-width:210px; background:#0c101c; color:#f1f5f9; padding:12px 14px; border-radius:12px; border:1px solid rgba(0,229,255,0.25); box-shadow:0 12px 32px rgba(0,0,0,0.7);'>
+                <b style='font-size:13px; color:#00E5FF; font-family:Space Grotesk,sans-serif; letter-spacing:-0.01em;'>#{i} {item['name']}</b><br/>
+                <span style='color:#94a3b8; font-size:11px;'>Confidence: <b style='color:#f8fafc;'>{item['confidence']*100:.1f}%</b></span><br/>
+                <span style='color:#cbd5e1; font-size:11px;'>Driving: <b>{item['driving_side']}</b></span><br/>
+                <hr style='margin:8px 0; border:none; height:1px; background:rgba(255,255,255,0.1);'/>
+                <a href='{m_gmaps}' target='_blank' style='color:#38bdf8; font-weight:600; text-decoration:none; margin-right:10px; font-size:11.5px;'>📍 Google Maps</a>
+                <a href='{m_earth}' target='_blank' style='color:#00F5A0; font-weight:600; text-decoration:none; font-size:11.5px;'>🌐 Google Earth</a>
             </div>
             """
             
@@ -685,10 +1005,10 @@ with col_right:
 
                 # Display card confirming selection & duplicate prevention guarantee
                 st.markdown(
-                    f"<div style='background:#f0fdf4; border:1px solid #bbf7d0; border-left:4px solid #16a34a; padding:10px 14px; border-radius:8px; margin:8px 0 12px 0;'>"
-                    f"<b>Selected Target:</b> {matched_loc['name']}<br/>"
-                    f"<span style='color:#4b5563; font-size:0.88rem;'>Category: <code>{reg_category}</code> | Country: <b>{reg_country}</b> | Region: <b>{reg_region}</b> | Driving: <b>{reg_driving}</b></span><br/>"
-                    f"<span style='color:#15803d; font-size:0.82rem; font-weight:600;'>🛡️ Duplicate Protection Active: Updates existing place in-place without duplicating.</span>"
+                    f"<div style='background:rgba(12,24,20,0.72); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid rgba(0,245,160,0.25); border-left:4px solid #00F5A0; padding:12px 16px; border-radius:10px; margin:8px 0 12px 0; box-shadow:0 8px 24px rgba(0,0,0,0.5);'>"
+                    f"<b style='color:#f8fafc; font-family:Space Grotesk,sans-serif;'>Selected Target:</b> <span style='color:#00E5FF; font-weight:600;'>{matched_loc['name']}</span><br/>"
+                    f"<span style='color:#94a3b8; font-size:0.88rem;'>Category: <code style='background:rgba(255,255,255,0.06); color:#38bdf8; border:1px solid rgba(255,255,255,0.08);'>{reg_category}</code> | Country: <b style='color:#f1f5f9;'>{reg_country}</b> | Region: <b style='color:#f1f5f9;'>{reg_region}</b> | Driving: <b style='color:#00F5A0;'>{reg_driving}</b></span><br/>"
+                    f"<span style='color:#00F5A0; font-size:0.82rem; font-weight:600;'>🛡️ Duplicate Protection Active: Updates existing place in-place without duplicating.</span>"
                     f"</div>",
                     unsafe_allow_html=True
                 )
