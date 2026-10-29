@@ -28,6 +28,8 @@ st.set_page_config(
 # Apple-Inspired Bright Light UI Design System (SF Pro Typography • Clean Light Aesthetic)
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
     :root {
         --apple-bg: #F5F5F7;
         --apple-surface: #FFFFFF;
@@ -93,9 +95,34 @@ st.markdown("""
         color: var(--apple-text-primary) !important;
     }
 
-    p, span, div, label {
+    p, label {
         font-family: var(--font-apple) !important;
         color: var(--apple-text-primary);
+    }
+
+    div, span {
+        color: var(--apple-text-primary);
+    }
+
+    /* Never override Streamlit Material ligature icon fonts */
+    [data-testid="stIconMaterial"],
+    .material-symbols-rounded,
+    .material-symbols-outlined,
+    .material-icons,
+    [class*="material-symbols"] {
+        font-family: "Material Symbols Rounded", "Material Symbols Outlined", "Material Icons" !important;
+        font-weight: normal !important;
+        font-style: normal !important;
+        line-height: 1 !important;
+        letter-spacing: normal !important;
+        text-transform: none !important;
+        display: inline-block !important;
+        white-space: nowrap !important;
+        word-wrap: normal !important;
+        direction: ltr !important;
+        -webkit-font-feature-settings: 'liga' 1 !important;
+        font-feature-settings: 'liga' 1 !important;
+        -webkit-font-smoothing: antialiased !important;
     }
 
     code, kbd, samp, pre {
@@ -344,19 +371,29 @@ st.markdown("""
     [data-testid="stFileUploader"] button[kind="secondary"] {
         background: #EBF5FF !important;
         color: var(--apple-blue) !important;
-        font-family: var(--font-apple) !important;
+        font-family: var(--font-apple);
         font-weight: 600 !important;
         font-size: 0.90rem !important;
         letter-spacing: -0.01em !important;
         border: 1px solid #CCE4FF !important;
         border-radius: var(--radius-pill) !important;
-        padding: 9px 24px !important;
+        padding: 8px 22px !important;
         box-shadow: 0 1px 4px rgba(0, 113, 227, 0.12) !important;
         transition: var(--transition-apple) !important;
         cursor: pointer !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
+        gap: 6px !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] button [data-testid="stIconMaterial"],
+    [data-testid="stFileUploaderDropzone"] button .material-symbols-rounded {
+        font-family: "Material Symbols Rounded", "Material Symbols Outlined", "Material Icons" !important;
+        font-size: 1.15rem !important;
+        line-height: 1 !important;
+        display: inline-block !important;
+        vertical-align: middle !important;
     }
 
     [data-testid="stFileUploaderDropzone"] button:hover,
