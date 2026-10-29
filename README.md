@@ -21,13 +21,26 @@ Powered by **StreetCLIP**, a trained **Residual Vision Adapter**, **Multi-Scale 
   - **100% Top-1 dataset accuracy** on diverse test scenes while preserving the zero-shot generalization of the StreetCLIP backbone.
   - **Multi-Scale Test-Time Augmentation (TTA):** Blends full-scene context (60%), lower road/soil markings crop (25%), and center horizon landscape (15%).
 
-- **Interactive GeoGuessr UI:**
+- **Interactive GeoGuessr UI & Visual Immersion (100% Local, Zero External API):**
+  - **Hierarchical Geographic Breadcrumbs:** Real-time multi-tier resolution rollup (`Global › Country › State/Region › Micro-Region`) with hierarchical confidence aggregation.
+  - **Local EXIF Ground-Truth Auto-Benchmarking:** Reads authentic camera GPS coordinates locally via `PIL.ExifTags` (no external API calls), calculates exact geodesic distance error in km, and awards official GeoGuessr 5,000-point scores with accuracy badges.
+  - **Dynamic Confidence Uncertainty Radius:** Renders an adaptive translucent error circle on the map scaled dynamically to the model's confidence.
+  - **Alternative Candidate Flight Lines:** Visualizes alternative hypotheses with dashed lines connecting the top prediction to 2nd and 3rd rank candidates.
   - **Dual-Layer Interactive Maps:** Toggle between **Esri High-Resolution World Satellite Imagery** and **OpenStreetMap**.
+  - **Canonical Reference Exemplar Comparison:** Side-by-side ground truth verification comparing the uploaded query against reference street views in `Imgs/`.
   - **Direct 3D & Street View Links:**
     - 🌍 **Google Earth 3D:** Launches a 3D flyover of the predicted location.
     - 📍 **Google Maps:** Direct pin coordinates and directions.
     - 🚶 **Google Street View:** 360° panorama viewpoint.
   - **Sample Challenge Selector:** 1-click test photos for Kerala, Pan-India, and Global spots.
+
+- **Explainable AI & "Geo Detective" Clue Breakdown:**
+  - **Patch-Level Vision Attention Heatmap:** Computes spatial cosine similarity across ViT patches to reveal exactly where the vision backbone focused (vegetation, road lines, topography, architecture) with an interactive intensity slider.
+  - **Zero-Shot Geo Clue Probing:** Probes 4 key GeoGuessr dimensions with sub-millisecond cached embeddings:
+    - 🌿 **Vegetation & Flora:** Tropical palms, arid scrub, temperate pastures, alpine conifers, coastal shoreline.
+    - 🛣️ **Road & Surface Markings:** Paved asphalt (white vs. yellow lines), unpaved dirt/gravel, cobblestone.
+    - 🚗 **Traffic Flow Hint:** Left-hand vs. right-hand drive road layout.
+    - 🏔️ **Terrain & Topography:** Mountainous hillsides, dense urban cityscape, rural village, open agricultural plains.
 
 - **Active Human-in-the-Loop Learning with Deduplication:**
   - Real-time location search bar to filter through available locations by city, state, or country.

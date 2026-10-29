@@ -8,12 +8,15 @@ import sys
 import streamlit as st
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
 import folium
 from folium.plugins import HeatMap
 from streamlit_folium import st_folium
-from PIL import Image
+from PIL import Image, ExifTags
 from transformers import CLIPModel, CLIPProcessor
 from geopy.geocoders import Nominatim
+from geopy.distance import geodesic
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -572,6 +575,120 @@ st.markdown("""
             scroll-behavior: auto !important;
         }
     }
+
+    /* Apple Hierarchical Geographic Breadcrumb */
+    .breadcrumb-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        background: #FFFFFF;
+        border: 1px solid var(--apple-border);
+        border-radius: var(--radius-pill);
+        padding: 7px 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+    }
+    .bc-node {
+        font-family: var(--font-apple);
+        font-size: 0.83rem;
+        font-weight: 500;
+        color: var(--apple-text-secondary);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .bc-node b {
+        color: var(--apple-text-primary);
+        font-weight: 600;
+    }
+    .bc-node.active {
+        color: var(--apple-blue);
+        font-weight: 600;
+    }
+    .bc-node.active b {
+        color: var(--apple-blue);
+    }
+    .bc-sep {
+        color: #C7C7CC;
+        font-size: 0.8rem;
+        user-select: none;
+    }
+
+    /* Apple GeoScore Benchmark Card */
+    .geo-score-card {
+        background: #FFFFFF;
+        border: 1px solid #D2E4F9;
+        border-left: 4px solid var(--apple-blue);
+        border-radius: var(--radius-card);
+        padding: 14px 18px;
+        box-shadow: var(--shadow-card);
+        margin: 12px 0 16px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .score-title {
+        font-family: var(--font-apple);
+        font-size: 0.76rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--apple-text-secondary);
+    }
+    .score-pts {
+        font-family: var(--font-apple);
+        font-size: 1.55rem;
+        font-weight: 700;
+        color: var(--apple-text-primary);
+        letter-spacing: -0.02em;
+    }
+    .score-badge {
+        font-family: var(--font-apple);
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: var(--radius-pill);
+        background: #EBF5FF;
+        color: var(--apple-blue);
+        border: 1px solid #CCE4FF;
+    }
+
+    /* Geo Clue Inspector Card */
+    .clue-inspector-card {
+        background: #FFFFFF;
+        border: 1px solid var(--apple-border);
+        border-radius: var(--radius-card);
+        padding: 14px 18px;
+        box-shadow: var(--shadow-card);
+        margin: 12px 0;
+    }
+    .clue-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px 0;
+        border-bottom: 1px solid #F2F2F7;
+        font-size: 0.86rem;
+    }
+    .clue-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+    .clue-label {
+        font-weight: 600;
+        color: var(--apple-text-primary);
+        font-size: 0.84rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .clue-val {
+        color: var(--apple-blue);
+        font-weight: 600;
+        font-size: 0.84rem;
+        text-align: right;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -597,6 +714,44 @@ class ResidualAdapter(nn.Module):
         residual = self.net(x)
         out = self.alpha * x + (1.0 - self.alpha) * residual
         return out / out.norm(dim=-1, keepdim=True)
+
+GEO_CLUE_DEFINITIONS = [
+    (
+        "🌿 Vegetation & Flora",
+        [
+            ("Tropical palms & lush foliage", "tropical coconut palms banana trees lush green monsoon foliage"),
+            ("Arid scrub & desert sand", "arid desert landscape dry red sand sparse scrub dry rocky terrain"),
+            ("Temperate meadows & deciduous woods", "temperate green agricultural fields deciduous forest pastures"),
+            ("Alpine conifers & snow peaks", "alpine evergreen pine conifers rugged mountain peaks cool climate"),
+            ("Coastal shoreline & ocean water", "coastal beach shoreline ocean waves maritime coastline")
+        ]
+    ),
+    (
+        "🛣️ Road & Surface",
+        [
+            ("Asphalt with white markings", "paved asphalt road with white pavement line markings"),
+            ("Asphalt with yellow markings", "paved asphalt road with yellow pavement line markings"),
+            ("Unpaved dirt / gravel track", "unpaved dirt gravel rural country road or mud trail"),
+            ("Historic stone / cobblestone", "historic cobblestone stone paved ancient alley street")
+        ]
+    ),
+    (
+        "🚗 Traffic Flow Hint",
+        [
+            ("Left-hand drive layout", "left-hand drive traffic driving on the left side of the road"),
+            ("Right-hand drive layout", "right-hand drive traffic driving on the right side of the road")
+        ]
+    ),
+    (
+        "🏔️ Terrain & Topography",
+        [
+            ("Mountainous winding hillside", "mountainous terrain winding hillside roads tea estates hills"),
+            ("Dense urban commercial cityscape", "dense multi-story modern urban cityscape commercial downtown"),
+            ("Rural village settlement", "quiet rural village countryside settlement with small houses"),
+            ("Flat open agricultural plains", "flat agricultural crop plains open landscape wide horizon")
+        ]
+    )
+]
 
 # --- Load StreetCLIP, Embeddings, Adapter & Correction Memory ---
 @st.cache_resource
@@ -646,9 +801,170 @@ def load_resources():
         except Exception:
             adapter = None
 
-    return processor, model, text_embeddings, locations, corrections, adapter
+    # Pre-encode Geo Clue definitions for fast zero-shot probing
+    clue_cache = []
+    for cat_name, items in GEO_CLUE_DEFINITIONS:
+        prompts = [it[1] for it in items]
+        t_in = processor(text=prompts, return_tensors="pt", padding=True, truncation=True, max_length=77)
+        with torch.no_grad():
+            t_out = model.get_text_features(input_ids=t_in["input_ids"])
+            t_raw = t_out.pooler_output if hasattr(t_out, "pooler_output") else t_out
+            t_norm = (t_raw / t_raw.norm(dim=-1, keepdim=True)).cpu()
+        clue_cache.append((cat_name, items, t_norm))
 
-processor, model, text_embeddings, locations, corrections, adapter = load_resources()
+    return processor, model, text_embeddings, locations, corrections, adapter, clue_cache
+
+processor, model, text_embeddings, locations, corrections, adapter, clue_cache = load_resources()
+
+# --- Explainable AI: Patch-Level Attention Heatmap ---
+def generate_attention_heatmap(image, target_text_embedding):
+    """
+    Computes patch-level visual similarity with the predicted location embedding.
+    Interpolates to original resolution and returns a normalized 2D float heatmap [0, 1].
+    """
+    inp = processor(images=image, return_tensors="pt")
+    with torch.no_grad():
+        v_out = model.vision_model(pixel_values=inp["pixel_values"])
+        patches = v_out.last_hidden_state[:, 1:, :]  # [1, 576, 1024]
+        proj = model.visual_projection(patches)       # [1, 576, 768]
+        proj_norm = proj / proj.norm(dim=-1, keepdim=True)
+
+        t_norm = target_text_embedding / target_text_embedding.norm(dim=-1, keepdim=True)
+        t_norm = t_norm.to(proj_norm.device)
+
+        sim = torch.matmul(proj_norm, t_norm.T).reshape(1, 1, 24, 24)
+        w, h = image.size
+        upsampled = F.interpolate(sim, size=(h, w), mode="bicubic", align_corners=False)
+        heat = upsampled.squeeze().cpu().numpy()
+
+        h_min, h_max = heat.min(), heat.max()
+        if h_max > h_min:
+            heat = (heat - h_min) / (h_max - h_min + 1e-8)
+        else:
+            heat = np.zeros_like(heat)
+    return heat
+
+def blend_heatmap_overlay(image, heat, alpha=0.45):
+    """
+    Overlays a smooth, high-contrast thermal colormap onto the original photo.
+    """
+    h = np.clip(heat, 0.0, 1.0)
+    r = np.clip(1.5 - np.abs(h * 4.0 - 3.0), 0.0, 1.0)
+    g = np.clip(1.5 - np.abs(h * 4.0 - 2.0), 0.0, 1.0)
+    b = np.clip(1.5 - np.abs(h * 4.0 - 1.0), 0.0, 1.0)
+    rgb_heat = (np.stack([r, g, b], axis=-1) * 255).astype(np.uint8)
+
+    im_np = np.array(image.convert("RGB"))
+    blended = (im_np * (1.0 - alpha) + rgb_heat * alpha).astype(np.uint8)
+    return Image.fromarray(blended)
+
+# --- Automated Geo Clue Detection (Zero-shot StreetCLIP Probe) ---
+def detect_geo_clues(image_embedding, clue_cache):
+    """
+    Probes image representation against GeoGuessr attribute dimensions.
+    Returns list of dicts: {"category": ..., "label": ..., "confidence": ...}
+    """
+    detected = []
+    emb = image_embedding.cpu().squeeze(0)
+    for cat_name, items, t_norm in clue_cache:
+        scores = torch.matmul(t_norm, emb)
+        probs = torch.softmax(scores * 18.0, dim=-1).tolist()
+        best_idx = int(scores.argmax().item())
+        best_label = items[best_idx][0]
+        best_conf = probs[best_idx]
+        detected.append({
+            "category": cat_name,
+            "label": best_label,
+            "confidence": best_conf
+        })
+    return detected
+
+# --- Local EXIF GPS Ground-Truth Extractor ---
+def extract_exif_gps(image):
+    """
+    Extracts authentic GPS coordinates from image EXIF metadata locally.
+    Returns (lat, lon) tuple in decimal degrees or None.
+    """
+    try:
+        exif = image.getexif()
+        if not exif:
+            return None
+        gps_ifd = exif.get_ifd(0x8825)
+        if not gps_ifd or 2 not in gps_ifd or 4 not in gps_ifd:
+            return None
+
+        def to_deg(dms):
+            if isinstance(dms, (int, float)):
+                return float(dms)
+            d, m, s = dms
+            return float(d) + float(m) / 60.0 + float(s) / 3600.0
+
+        lat = to_deg(gps_ifd[2])
+        if gps_ifd.get(1) == 'S':
+            lat = -lat
+        lon = to_deg(gps_ifd[4])
+        if gps_ifd.get(3) == 'W':
+            lon = -lon
+
+        if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0:
+            return (lat, lon)
+    except Exception:
+        pass
+    return None
+
+def calc_geoguessr_score(distance_km):
+    """
+    Official GeoGuessr exponential scoring curve (0 to 5,000 points).
+    Score = 5000 * exp(-distance / 2000 km)
+    """
+    return int(max(0, min(5000, 5000.0 * np.exp(-distance_km / 2000.0))))
+
+# --- Hierarchical Geographic Aggregation ---
+def compute_hierarchical_rollup(ranked_candidates):
+    """
+    Aggregates top candidate confidences by Country and Region.
+    """
+    country_weights = {}
+    region_weights = {}
+    for item in ranked_candidates:
+        c = item.get("country", "Unknown")
+        r = item.get("region", "")
+        p = item.get("confidence", 0.0)
+        country_weights[c] = country_weights.get(c, 0.0) + p
+        if r:
+            reg_key = f"{r}, {c}" if c and c != "Unknown" else r
+            region_weights[reg_key] = region_weights.get(reg_key, 0.0) + p
+
+    top_country = max(country_weights.items(), key=lambda x: x[1]) if country_weights else ("Unknown", 0.0)
+    top_region = max(region_weights.items(), key=lambda x: x[1]) if region_weights else ("", 0.0)
+    return top_country, top_region
+
+# --- Canonical Reference Exemplar Finder ---
+def find_reference_exemplar(location_name):
+    """
+    Finds a canonical reference image from the local Imgs/ repository matching the location.
+    """
+    if not os.path.exists("Imgs"):
+        return None
+    loc_clean = location_name.lower().replace(",", " ").replace("-", " ")
+    tokens = [t.strip() for t in loc_clean.split() if len(t.strip()) > 2 and t.strip() not in {"the", "and", "near", "district", "town", "city"}]
+
+    best_img = None
+    best_score = 0
+    for fname in os.listdir("Imgs"):
+        if not fname.lower().endswith((".jpg", ".jpeg", ".png")):
+            continue
+        fn_clean = fname.lower().replace(".jpg", "").replace(".jpeg", "").replace(".png", "").replace("_", " ").replace("-", " ")
+        fn_tokens = set(fn_clean.split())
+        matched = [t for t in tokens if t in fn_tokens]
+        score = len(matched)
+        if score > best_score and score >= 2:
+            best_score = score
+            best_img = fname
+
+    if best_img:
+        return os.path.join("Imgs", best_img)
+    return None
 
 # --- Multi-Scale Test-Time Augmentation (TTA) Feature Extraction ---
 def extract_visual_representation(image):
@@ -727,7 +1043,7 @@ def predict_location(image, current_embeddings, current_locations, corrections_l
             "confidence": prob
         })
     ranked.sort(key=lambda x: x["confidence"], reverse=True)
-    return ranked
+    return ranked, image_embedding
 
 # --- Register Human Feedback & Retrain Prompt Embeddings ---
 def apply_user_correction(
@@ -1013,9 +1329,30 @@ with col_left:
             del st.session_state["ranked"]
         if "last_image" in st.session_state:
             del st.session_state["last_image"]
+        if "image_embedding" in st.session_state:
+            del st.session_state["image_embedding"]
+        if "heat_cache" in st.session_state:
+            del st.session_state["heat_cache"]
 
     if image is not None:
-        st.image(image, caption="Query Photo", use_container_width=True)
+        if "ranked" in st.session_state and len(st.session_state["ranked"]) > 0:
+            show_attention = st.checkbox("👁️ Show AI Vision Focus (Attention Heatmap)", value=False)
+            if show_attention:
+                heat_alpha = st.slider("Heatmap Intensity:", min_value=0.20, max_value=0.85, value=0.45, step=0.05)
+                top_name = st.session_state["ranked"][0]["name"]
+                if st.session_state.get("heat_cache_key") != f"{img_source_key}_{top_name}":
+                    top_idx = next((i for i, l in enumerate(locations) if l["name"] == top_name), 0)
+                    t_emb = text_embeddings[top_idx:top_idx+1]
+                    st.session_state["heat_cache"] = generate_attention_heatmap(image, t_emb)
+                    st.session_state["heat_cache_key"] = f"{img_source_key}_{top_name}"
+
+                blended_im = blend_heatmap_overlay(image, st.session_state["heat_cache"], alpha=heat_alpha)
+                st.image(blended_im, caption=f"🔥 StreetCLIP Vision Focus on {top_name.split(',')[0]}", use_container_width=True)
+            else:
+                st.image(image, caption="Query Photo", use_container_width=True)
+        else:
+            st.image(image, caption="Query Photo", use_container_width=True)
+
         predict_btn = st.button("📍 Geoguess & Analyze Location", type="primary", use_container_width=True)
 
 with col_right:
@@ -1023,18 +1360,92 @@ with col_right:
 
     if image is not None and "predict_btn" in locals() and predict_btn:
         with st.spinner(f"Running multi-scale vision inference across {len(locations)} locations..."):
-            ranked = predict_location(image, text_embeddings, locations, corrections_list=corrections, category_filter=selected_scope)
+            ranked, img_emb = predict_location(image, text_embeddings, locations, corrections_list=corrections, category_filter=selected_scope)
             st.session_state["ranked"] = ranked
             st.session_state["last_image"] = image
+            st.session_state["image_embedding"] = img_emb
 
     if "ranked" in st.session_state and len(st.session_state["ranked"]) > 0:
         ranked = st.session_state["ranked"]
         top_pick = ranked[0]
         top_lat = top_pick["lat"]
         top_lon = top_pick["lon"]
+        img_emb = st.session_state.get("image_embedding", None)
+        if img_emb is None and "last_image" in st.session_state:
+            img_emb = extract_visual_representation(st.session_state["last_image"])
 
         # URLs for Google Maps and Google Earth
         gmaps_url, gearth_url, gstreet_url = get_map_urls(top_lat, top_lon)
+
+        # 1. Hierarchical Geographic Breadcrumb
+        top_country, top_region = compute_hierarchical_rollup(ranked)
+        c_name, c_conf = top_country
+        r_name, r_conf = top_region
+        reg_clean = r_name.split(",")[0].strip() if "," in r_name else r_name
+        st.markdown(f"""
+        <div class="breadcrumb-bar">
+            <span class="bc-node">🌍 <b>Global</b></span>
+            <span class="bc-sep">›</span>
+            <span class="bc-node">🚩 <b>{c_name}</b> <small>({c_conf*100:.1f}%)</small></span>
+            <span class="bc-sep">›</span>
+            <span class="bc-node">📍 <b>{reg_clean}</b> <small>({r_conf*100:.1f}%)</small></span>
+            <span class="bc-sep">›</span>
+            <span class="bc-node active">🎯 <b>{top_pick['name'].split(',')[0]}</b> <small>({top_pick['confidence']*100:.1f}%)</small></span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 2. Local EXIF GPS Ground-Truth Auto-Benchmarking
+        exif_coords = extract_exif_gps(image)
+        benchmark_coords = None
+        benchmark_source = None
+        dist_err = None
+
+        if exif_coords is not None:
+            benchmark_coords = exif_coords
+            benchmark_source = "Camera GPS EXIF"
+            dist_err = geodesic((top_lat, top_lon), benchmark_coords).kilometers
+            score = calc_geoguessr_score(dist_err)
+            badge_text = "🎯 Pinpoint (<25km)" if dist_err < 25 else ("🌟 Regional (<150km)" if dist_err < 150 else "✈️ Continental")
+            st.markdown(f"""
+            <div class="geo-score-card">
+                <div>
+                    <div class="score-title">🏆 GeoGuessr Match Score ({benchmark_source})</div>
+                    <div class="score-pts">{score:,} <span style="font-size:0.95rem; font-weight:500; color:var(--apple-text-secondary);">/ 5,000 pts</span></div>
+                    <div style="font-size:0.83rem; color:var(--apple-text-secondary); margin-top:3px;">
+                        Error: <b style="color:var(--apple-text-primary);">{dist_err:.1f} km</b> from authentic GPS coordinates
+                    </div>
+                </div>
+                <div>
+                    <span class="score-badge">{badge_text}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='margin-bottom: 12px;'><span class='score-badge' style='background:#F2F2F7; color:#6E6E73; border-color:#E5E5EA;'>🛡️ Blind Evaluation: 100% Vision-Based Prediction (No EXIF GPS in photo)</span></div>", unsafe_allow_html=True)
+            with st.expander("🎯 Benchmark AI Against Known Ground Truth", expanded=False):
+                st.caption("Select the known location where this photo was taken to calculate the model's distance error and GeoGuessr score:")
+                bench_choice = st.selectbox("Ground Truth Location:", [l["name"] for l in locations], key="bench_gt_loc")
+                bench_loc = next((l for l in locations if l["name"] == bench_choice), None)
+                if bench_loc:
+                    dist_err = geodesic((top_lat, top_lon), (bench_loc["lat"], bench_loc["lon"])).kilometers
+                    score = calc_geoguessr_score(dist_err)
+                    badge_text = "🎯 Pinpoint (<25km)" if dist_err < 25 else ("🌟 Regional (<150km)" if dist_err < 150 else "✈️ Continental")
+                    st.markdown(f"""
+                    <div class="geo-score-card">
+                        <div>
+                            <div class="score-title">🎯 Manual Ground Truth Score</div>
+                            <div class="score-pts">{score:,} <span style="font-size:0.95rem; font-weight:500; color:var(--apple-text-secondary);">/ 5,000 pts</span></div>
+                            <div style="font-size:0.83rem; color:var(--apple-text-secondary); margin-top:3px;">
+                                Error: <b style="color:var(--apple-text-primary);">{dist_err:.1f} km</b> to {bench_choice.split(',')[0]}
+                            </div>
+                        </div>
+                        <div>
+                            <span class="score-badge">{badge_text}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    benchmark_coords = (bench_loc["lat"], bench_loc["lon"])
+                    benchmark_source = "Selected Benchmark"
 
         # Top Match Hero Card
         st.success(f"### 🎯 Top Match: **{top_pick['name']}**")
@@ -1077,6 +1488,46 @@ with col_right:
         heat_data = [[item["lat"], item["lon"], item["confidence"]] for item in ranked[:15]]
         HeatMap(heat_data, radius=25, blur=18, max_zoom=14).add_to(m)
 
+        # Dynamic Confidence Uncertainty Radius Circle
+        uncert_km = int(max(15, min(650, (1.0 - top_pick["confidence"]) * 750)))
+        folium.Circle(
+            location=[top_lat, top_lon],
+            radius=uncert_km * 1000,
+            color="#0071E3",
+            weight=1.5,
+            fill=True,
+            fill_color="#0071E3",
+            fill_opacity=0.12,
+            tooltip=f"Confidence Margin: ±{uncert_km} km"
+        ).add_to(m)
+
+        # Alternative Candidate Flight Lines (Top 2 & 3)
+        for alt in ranked[1:3]:
+            alt_dist = geodesic((top_lat, top_lon), (alt["lat"], alt["lon"])).kilometers
+            folium.PolyLine(
+                locations=[[top_lat, top_lon], [alt["lat"], alt["lon"]]],
+                color="#5856D6",
+                weight=1.5,
+                dash_array="5, 8",
+                opacity=0.6,
+                tooltip=f"Alternative: {alt['name']} ({alt_dist:.0f} km away)"
+            ).add_to(m)
+
+        # Benchmark Ground-Truth Marker & Distance Error Line
+        if benchmark_coords is not None and dist_err is not None:
+            folium.Marker(
+                [benchmark_coords[0], benchmark_coords[1]],
+                popup=f"🎯 Ground Truth ({benchmark_source})",
+                icon=folium.Icon(color="green", icon="ok-sign")
+            ).add_to(m)
+            folium.PolyLine(
+                locations=[[top_lat, top_lon], [benchmark_coords[0], benchmark_coords[1]]],
+                color="#FF3B30",
+                weight=2.5,
+                dash_array="6, 8",
+                tooltip=f"Distance Error: {dist_err:.1f} km"
+            ).add_to(m)
+
         # Add top 5 ranked markers with custom popups including Google Earth links
         for i, item in enumerate(ranked[:5], start=1):
             color = "red" if i == 1 else ("orange" if i == 2 else "blue")
@@ -1103,8 +1554,20 @@ with col_right:
         folium.LayerControl(position="topright").add_to(m)
         st_folium(m, use_container_width=True, height=400)
 
-        # GeoGuessr Clues Inspector
+        # Automated Geo Detective Clue Inspector (Feature 2)
         st.markdown("#### 🕵️ GeoGuessr Detective Breakdown")
+        if img_emb is not None:
+            clue_results = detect_geo_clues(img_emb, clue_cache)
+            st.markdown("""<div class="clue-inspector-card">""", unsafe_allow_html=True)
+            for cr in clue_results:
+                st.markdown(f"""
+                <div class="clue-row">
+                    <span class="clue-label">{cr['category']}</span>
+                    <span class="clue-val">{cr['label']} <small style="color:var(--apple-text-secondary); font-weight:normal;">({cr['confidence']*100:.1f}%)</small></span>
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
         st.markdown(
             f"<span class='clue-badge badge-cat'>🏷️ {top_pick['category']}</span>"
             f"<span class='clue-badge badge-left'>{driving_icon}</span>"
@@ -1113,6 +1576,18 @@ with col_right:
         )
         if top_pick.get("prompt"):
             st.caption(f"**Visual Meta Clues:** *{top_pick['prompt']}*")
+
+        # Canonical Reference Exemplar Comparison (Feature 3)
+        ref_image_path = find_reference_exemplar(top_pick["name"])
+        if ref_image_path and os.path.exists(ref_image_path):
+            st.markdown("#### 🖼️ Canonical Reference Comparison")
+            st.caption(f"Comparing your query photo against our ground-truth reference scene for **{top_pick['name']}**:")
+            c_orig, c_ref = st.columns(2)
+            with c_orig:
+                st.image(image, caption="Your Query Photo", use_container_width=True)
+            with c_ref:
+                ref_im = Image.open(ref_image_path).convert("RGB")
+                st.image(ref_im, caption=f"Ground-Truth Reference: {os.path.basename(ref_image_path).replace('_', ' ').replace('.jpg', '')}", use_container_width=True)
 
         # Top 5 Candidates List with Direct Maps/Earth shortcuts
         st.markdown("#### 🏆 Top Ranked Candidates")
@@ -1302,7 +1777,7 @@ with col_right:
                     )
 
                     # Immediately re-evaluate the image with updated memory
-                    new_ranked = predict_location(
+                    new_ranked, new_emb = predict_location(
                         st.session_state["last_image"],
                         new_embeddings,
                         new_locations,
@@ -1311,6 +1786,7 @@ with col_right:
                     )
 
                     st.session_state["ranked"] = new_ranked
+                    st.session_state["image_embedding"] = new_emb
                     action_text = "Registered new location" if was_added else "Updated existing location in-place (no duplicate)"
                     st.session_state["just_corrected"] = {
                         "old": old_top_name,
