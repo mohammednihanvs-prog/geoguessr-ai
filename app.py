@@ -10,6 +10,7 @@ import json
 import urllib.request
 import urllib.parse
 import streamlit as st
+import streamlit.components.v1 as components
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -32,48 +33,114 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Apple-Inspired Bright Light UI Design System (SF Pro Typography • Clean Light Aesthetic)
+# ==============================================================================
+# Aero-Orbital Tactical HUD Design System (Awwwards-Level Cyber-Cartography)
+# Base: Obsidian Void #04060A | Accent: Hyper-Cyan #00F0FF | Secondary: Solar Gold #FFB800
+# Typography: Space Grotesk (Display) • JetBrains Mono (Telemetry) • Plus Jakarta Sans (Body)
+# ==============================================================================
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
 
     :root {
-        --apple-bg: #F5F5F7;
-        --apple-surface: #FFFFFF;
-        --apple-surface-hover: #FBFBFD;
-        --apple-border: #E5E5EA;
-        --apple-border-focus: #0071E3;
-        --apple-blue: #0071E3;
-        --apple-blue-hover: #0077ED;
-        --apple-green: #34C759;
-        --apple-purple: #5856D6;
-        --apple-orange: #FF9500;
-        --apple-text-primary: #1D1D1F;
-        --apple-text-secondary: #86868B;
-        --apple-text-tertiary: #6E6E73;
-        --font-apple: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
-        --font-mono: "SF Mono", Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
-        --radius-card: 16px;
-        --radius-pill: 980px;
-        --radius-sm: 10px;
-        --shadow-subtle: 0 2px 12px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-        --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
-        --shadow-card-hover: 0 12px 36px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
-        --shadow-button: 0 2px 8px rgba(0, 113, 227, 0.25);
-        --transition-apple: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        /* Core Cyber-Cartographic Palette */
+        --hud-bg-void: #04060A;
+        --hud-bg-base: #070B16;
+        --hud-bg-surface: rgba(10, 16, 30, 0.72);
+        --hud-bg-surface-elevated: rgba(14, 22, 42, 0.85);
+        --hud-bg-card: rgba(8, 14, 28, 0.76);
+        --hud-border: rgba(0, 240, 255, 0.16);
+        --hud-border-bright: rgba(0, 240, 255, 0.42);
+        --hud-border-focus: #00F0FF;
+        --hud-cyan: #00F0FF;
+        --hud-cyan-glow: rgba(0, 240, 255, 0.35);
+        --hud-cyan-subtle: rgba(0, 240, 255, 0.08);
+        --hud-amber: #FFB800;
+        --hud-amber-glow: rgba(255, 184, 0, 0.28);
+        --hud-emerald: #00FFA3;
+        --hud-emerald-glow: rgba(0, 255, 163, 0.28);
+        --hud-purple: #7000FF;
+        --hud-crimson: #FF2A55;
+        --hud-text-primary: #F0F6FC;
+        --hud-text-secondary: #8B9BB4;
+        --hud-text-tertiary: #52637A;
+        --hud-text-muted: #3D4B60;
+
+        /* Compatibility Aliases for Inline Styles */
+        --apple-bg: var(--hud-bg-base);
+        --apple-surface: var(--hud-bg-surface);
+        --apple-surface-hover: var(--hud-bg-surface-elevated);
+        --apple-border: var(--hud-border);
+        --apple-border-focus: var(--hud-border-focus);
+        --apple-blue: var(--hud-cyan);
+        --apple-blue-hover: #38F8FF;
+        --apple-green: var(--hud-emerald);
+        --apple-purple: var(--hud-purple);
+        --apple-orange: var(--hud-amber);
+        --apple-text-primary: var(--hud-text-primary);
+        --apple-text-secondary: var(--hud-text-secondary);
+        --apple-text-tertiary: var(--hud-text-tertiary);
+
+        --font-display: 'Space Grotesk', -apple-system, sans-serif;
+        --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+        --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+        --font-apple: var(--font-body);
+
+        --radius-card: 14px;
+        --radius-pill: 9999px;
+        --radius-sm: 8px;
+
+        --shadow-hud-sm: 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 1px rgba(0, 240, 255, 0.2);
+        --shadow-hud: 0 8px 32px rgba(0, 0, 0, 0.65), 0 0 16px rgba(0, 240, 255, 0.08);
+        --shadow-hud-glow: 0 12px 40px rgba(0, 0, 0, 0.75), 0 0 24px rgba(0, 240, 255, 0.25);
+        --shadow-button-glow: 0 0 24px rgba(0, 240, 255, 0.45), 0 4px 14px rgba(0, 0, 0, 0.5);
+
+        --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    /* Bright Apple Product Page Background */
+    /* Deep Space Terminal Background with Quantum Gradients */
     .stApp {
-        background-color: var(--apple-bg) !important;
-        background-image: linear-gradient(180deg, #FFFFFF 0%, #F5F5F7 280px) !important;
-        color: var(--apple-text-primary) !important;
-        font-family: var(--font-apple) !important;
+        background-color: var(--hud-bg-void) !important;
+        background-image: 
+            radial-gradient(ellipse 90% 40% at 50% -10%, rgba(0, 240, 255, 0.12), transparent 70%),
+            radial-gradient(ellipse 60% 30% at 100% 40%, rgba(112, 0, 255, 0.08), transparent 60%),
+            radial-gradient(ellipse 50% 30% at 0% 80%, rgba(0, 255, 163, 0.06), transparent 60%),
+            linear-gradient(180deg, #05070E 0%, #070B16 100%) !important;
+        color: var(--hud-text-primary) !important;
+        font-family: var(--font-body) !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        overflow-x: hidden !important;
+        position: relative;
     }
 
-    /* Hide Streamlit default chrome & deploy clutter */
+    /* Subtle CRT Micro-Scanlines Overlay */
+    .stApp::before {
+        content: "";
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.18) 50%);
+        background-size: 100% 4px;
+        z-index: 999990;
+        pointer-events: none;
+        opacity: 0.65;
+    }
+
+    /* Scroll Progress Line Indicator */
+    #geo-scroll-progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 2px;
+        width: 0%;
+        background: linear-gradient(90deg, #00F0FF, #7000FF, #00FFA3);
+        box-shadow: 0 0 10px #00F0FF;
+        z-index: 999999;
+        pointer-events: none;
+        transition: width 0.08s linear;
+    }
+
+    /* Hide Streamlit Clutter Chrome */
     #MainMenu, header, footer, .stDeployButton, div[data-testid="stDecoration"] {
         display: none !important;
         visibility: hidden !important;
@@ -84,31 +151,45 @@ st.markdown("""
         pointer-events: none !important;
     }
 
-    /* Apple Ergonomic Page Container Spacing */
+    /* Tactical Container Spacing */
     .block-container {
         padding-top: 2rem !important;
-        padding-bottom: 4rem !important;
+        padding-bottom: 5rem !important;
         padding-left: 2rem !important;
         padding-right: 2rem !important;
-        max-width: 1280px !important;
+        max-width: 1320px !important;
         margin: 0 auto !important;
     }
 
-    /* Apple SF Pro Typography System */
+    /* Typography Rules */
     h1, h2, h3, h4, h5, h6 {
-        font-family: var(--font-apple) !important;
-        letter-spacing: -0.028em;
+        font-family: var(--font-display) !important;
+        letter-spacing: -0.025em;
         font-weight: 700;
-        color: var(--apple-text-primary) !important;
+        color: var(--hud-text-primary) !important;
+        text-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
     }
 
-    p, label {
-        font-family: var(--font-apple) !important;
-        color: var(--apple-text-primary);
+    /* Tactical Left Accent Bar on Headings */
+    h2, h3 {
+        position: relative;
+        padding-left: 12px;
+    }
+    h2::before, h3::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 20%;
+        height: 60%;
+        width: 3px;
+        background: #00F0FF;
+        box-shadow: 0 0 10px #00F0FF;
+        border-radius: 2px;
     }
 
-    div, span {
-        color: var(--apple-text-primary);
+    p, label, span, div {
+        font-family: var(--font-body);
+        color: var(--hud-text-primary);
     }
 
     /* Never override Streamlit Material ligature icon fonts */
@@ -134,440 +215,711 @@ st.markdown("""
 
     code, kbd, samp, pre {
         font-family: var(--font-mono) !important;
+        background: rgba(0, 240, 255, 0.08) !important;
+        border: 1px solid rgba(0, 240, 255, 0.2) !important;
+        color: #00F0FF !important;
+        border-radius: 4px !important;
+        padding: 2px 6px !important;
     }
 
-    /* Text Selection Highlight (Apple Translucent Blue) */
+    /* Luminous Cyan Text Selection */
     ::selection {
-        background: rgba(0, 113, 227, 0.2) !important;
-        color: #1D1D1F !important;
+        background: rgba(0, 240, 255, 0.3) !important;
+        color: #FFFFFF !important;
     }
 
-    /* Apple Signature Title Header */
+    /* Custom Cybernetic Scrollbar */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #05070E;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(0, 240, 255, 0.25);
+        border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #00F0FF;
+        box-shadow: 0 0 8px #00F0FF;
+    }
+
+    /* Futuristic Tactical Brand Header */
     .main-header {
-        font-family: var(--font-apple);
-        font-size: 2.7rem;
-        font-weight: 700;
-        letter-spacing: -0.035em;
-        color: #1D1D1F !important;
-        background: linear-gradient(135deg, #1D1D1F 0%, #0071E3 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.3rem;
-        display: inline-block;
+        font-family: var(--font-display) !important;
+        font-size: clamp(2rem, 3.8vw, 3.2rem) !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.035em !important;
+        color: #FFFFFF !important;
+        background: linear-gradient(135deg, #FFFFFF 20%, #00F0FF 80%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        margin-bottom: 0.4rem !important;
+        display: inline-block !important;
+        text-shadow: 0 0 40px rgba(0, 240, 255, 0.4);
+        position: relative;
     }
 
     .main-subtitle {
-        font-family: var(--font-apple) !important;
+        font-family: var(--font-body) !important;
         font-size: 1.05rem !important;
-        color: var(--apple-text-tertiary) !important;
-        line-height: 1.55 !important;
+        color: var(--hud-text-secondary) !important;
+        line-height: 1.6 !important;
         margin-top: -0.1rem !important;
-        margin-bottom: 1.6rem !important;
+        margin-bottom: 1.2rem !important;
+        max-width: 950px !important;
     }
 
-    /* Clean Bright Sidebar with macOS Glass Frost */
+    .main-subtitle b {
+        color: #00F0FF !important;
+        font-weight: 600 !important;
+    }
+
+    /* Sci-Fi Streaming Telemetry Marquee */
+    .hud-ticker-wrap {
+        width: 100%;
+        overflow: hidden;
+        background: rgba(0, 240, 255, 0.04);
+        border-top: 1px solid rgba(0, 240, 255, 0.15);
+        border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+        padding: 7px 0;
+        margin-bottom: 1.8rem;
+        position: relative;
+        backdrop-filter: blur(8px);
+    }
+    .hud-ticker-track {
+        display: inline-flex;
+        white-space: nowrap;
+        animation: hud-ticker-scroll 35s linear infinite;
+        gap: 1.8rem;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--hud-text-secondary);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    .hud-ticker-track span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .hud-ticker-sep {
+        color: #00F0FF !important;
+        opacity: 0.6;
+    }
+    @keyframes hud-ticker-scroll {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+    }
+
+    /* Sidebar Command Console */
     [data-testid="stSidebar"] {
-        background: rgba(245, 245, 247, 0.88) !important;
-        backdrop-filter: blur(24px) saturate(180%) !important;
-        -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-        border-right: 1px solid var(--apple-border) !important;
+        background: rgba(5, 8, 16, 0.90) !important;
+        backdrop-filter: blur(28px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+        border-right: 1px solid rgba(0, 240, 255, 0.14) !important;
+        box-shadow: 4px 0 30px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    [data-testid="stSidebar"] h1, 
+    [data-testid="stSidebar"] h2, 
+    [data-testid="stSidebar"] h3, 
+    [data-testid="stSidebar"] h4 {
+        font-family: var(--font-display) !important;
+        color: var(--hud-cyan) !important;
+        font-size: 1.15rem !important;
+        letter-spacing: 0.02em !important;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
 
     [data-testid="stSidebar"] hr {
         border: none !important;
         height: 1px !important;
-        background: var(--apple-border) !important;
+        background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.25), transparent) !important;
+        margin: 18px 0 !important;
     }
 
-    /* Bright Apple Metric Cards */
+    /* Metrics HUD Bento-Boxes */
     [data-testid="stMetric"] {
-        background: var(--apple-surface) !important;
-        border: 1px solid var(--apple-border) !important;
+        background: var(--hud-bg-card) !important;
+        backdrop-filter: blur(16px) !important;
+        border: 1px solid var(--hud-border) !important;
         border-radius: var(--radius-card) !important;
         padding: 16px 20px !important;
-        box-shadow: var(--shadow-card) !important;
-        transition: var(--transition-apple) !important;
+        box-shadow: var(--shadow-hud) !important;
+        transition: var(--transition-smooth) !important;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Corner HUD Reticle Accents */
+    [data-testid="stMetric"]::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0;
+        width: 8px; height: 8px;
+        border-top: 2px solid #00F0FF;
+        border-left: 2px solid #00F0FF;
+        pointer-events: none;
+        opacity: 0.7;
+        transition: var(--transition-smooth);
+    }
+    [data-testid="stMetric"]::after {
+        content: "";
+        position: absolute;
+        bottom: 0; right: 0;
+        width: 8px; height: 8px;
+        border-bottom: 2px solid #00F0FF;
+        border-right: 2px solid #00F0FF;
+        pointer-events: none;
+        opacity: 0.7;
+        transition: var(--transition-smooth);
     }
 
     [data-testid="stMetric"]:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-card-hover) !important;
-        border-color: rgba(0, 113, 227, 0.3) !important;
+        transform: translateY(-3px);
+        border-color: rgba(0, 240, 255, 0.45) !important;
+        box-shadow: var(--shadow-hud-glow) !important;
+    }
+    [data-testid="stMetric"]:hover::before,
+    [data-testid="stMetric"]:hover::after {
+        opacity: 1;
+        width: 14px;
+        height: 14px;
+        box-shadow: 0 0 10px #00F0FF;
     }
 
     [data-testid="stMetricLabel"] {
-        font-family: var(--font-apple) !important;
-        font-size: 0.76rem !important;
+        font-family: var(--font-mono) !important;
+        font-size: 0.75rem !important;
         font-weight: 600 !important;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--apple-text-secondary) !important;
+        letter-spacing: 0.08em;
+        color: var(--hud-text-secondary) !important;
     }
 
     [data-testid="stMetricValue"] {
-        font-family: var(--font-apple) !important;
-        font-size: 1.55rem !important;
+        font-family: var(--font-display) !important;
+        font-size: 1.65rem !important;
         font-weight: 700 !important;
-        color: var(--apple-text-primary) !important;
+        color: #FFFFFF !important;
         letter-spacing: -0.02em !important;
+        text-shadow: 0 0 15px rgba(0, 240, 255, 0.3) !important;
     }
 
-    /* Apple Signature Pill Buttons (Primary Apple Blue) */
+    /* Magnetic & Sci-Fi Action Buttons */
     .stButton button[kind="primary"] {
-        background: var(--apple-blue) !important;
-        color: #FFFFFF !important;
-        font-family: var(--font-apple) !important;
-        font-weight: 500 !important;
-        font-size: 0.95rem !important;
-        letter-spacing: -0.01em;
+        background: linear-gradient(135deg, #00F0FF 0%, #0088FF 100%) !important;
+        color: #04060A !important;
+        font-family: var(--font-display) !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        letter-spacing: 0.01em !important;
+        text-transform: uppercase;
         border: none !important;
         border-radius: var(--radius-pill) !important;
-        padding: 12px 26px !important;
-        box-shadow: var(--shadow-button) !important;
-        transition: var(--transition-apple) !important;
+        padding: 14px 28px !important;
+        box-shadow: var(--shadow-button-glow) !important;
+        transition: var(--transition-smooth) !important;
+        cursor: pointer !important;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stButton button[kind="primary"]::before {
+        content: "";
+        position: absolute;
+        top: -50%; left: -50%;
+        width: 200%; height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 60%);
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
     }
 
     .stButton button[kind="primary"]:hover {
-        background: var(--apple-blue-hover) !important;
-        transform: scale(1.01) !important;
-        box-shadow: 0 4px 14px rgba(0, 113, 227, 0.35) !important;
+        transform: translateY(-2px) scale(1.015) !important;
+        box-shadow: 0 0 32px rgba(0, 240, 255, 0.7), 0 6px 20px rgba(0, 0, 0, 0.6) !important;
+        color: #020306 !important;
+    }
+    .stButton button[kind="primary"]:hover::before {
+        opacity: 1;
     }
 
-    /* Secondary Apple Soft Gray Buttons */
     .stButton button[kind="secondary"] {
-        background: #E8E8ED !important;
-        color: var(--apple-text-primary) !important;
-        font-family: var(--font-apple) !important;
-        font-weight: 500 !important;
-        border: 1px solid transparent !important;
+        background: rgba(0, 240, 255, 0.06) !important;
+        color: #00F0FF !important;
+        font-family: var(--font-display) !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        border: 1px solid rgba(0, 240, 255, 0.32) !important;
         border-radius: var(--radius-pill) !important;
-        padding: 10px 22px !important;
-        transition: var(--transition-apple) !important;
+        padding: 12px 24px !important;
+        transition: var(--transition-smooth) !important;
+        box-shadow: 0 0 16px rgba(0, 240, 255, 0.1) !important;
     }
 
     .stButton button[kind="secondary"]:hover {
-        background: #DCDCE2 !important;
-        color: var(--apple-text-primary) !important;
-        transform: translateY(-1px) !important;
+        background: rgba(0, 240, 255, 0.14) !important;
+        border-color: #00F0FF !important;
+        color: #FFFFFF !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 0 24px rgba(0, 240, 255, 0.35) !important;
     }
 
-    /* Apple White Link Buttons (Maps / Earth / Street View) */
+    /* Link Buttons (Google Maps / Earth / Street View) */
     .stLinkButton a {
-        background: var(--apple-surface) !important;
-        border: 1px solid #D2D2D7 !important;
+        background: rgba(10, 16, 32, 0.8) !important;
+        border: 1px solid rgba(0, 240, 255, 0.22) !important;
         border-radius: var(--radius-pill) !important;
-        color: var(--apple-blue) !important;
-        font-family: var(--font-apple) !important;
-        font-weight: 500 !important;
-        font-size: 0.88rem !important;
-        transition: var(--transition-apple) !important;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+        color: #00F0FF !important;
+        font-family: var(--font-mono) !important;
+        font-weight: 600 !important;
+        font-size: 0.86rem !important;
+        letter-spacing: 0.02em !important;
+        transition: var(--transition-smooth) !important;
+        box-shadow: var(--shadow-hud-sm) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
     .stLinkButton a:hover {
-        border-color: var(--apple-blue) !important;
-        background: var(--apple-surface-hover) !important;
-        color: var(--apple-blue-hover) !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 3px 10px rgba(0, 113, 227, 0.15) !important;
+        border-color: #00F0FF !important;
+        background: rgba(0, 240, 255, 0.12) !important;
+        color: #FFFFFF !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 0 20px rgba(0, 240, 255, 0.35) !important;
     }
 
-    /* Bright Apple Form Controls & Inputs */
-    .stTextInput input {
-        background: var(--apple-surface) !important;
-        border: 1px solid #D2D2D7 !important;
-        border-radius: var(--radius-sm) !important;
-        color: var(--apple-text-primary) !important;
-        font-family: var(--font-apple) !important;
-        font-size: 0.95rem !important;
-        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04) !important;
-        transition: var(--transition-apple) !important;
-    }
-
-    .stTextInput input:focus {
-        border-color: var(--apple-blue) !important;
-        box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16) !important;
-        outline: none !important;
-    }
-
-    div[data-baseweb="select"] {
-        background: var(--apple-surface) !important;
-        border: 1px solid #D2D2D7 !important;
-        border-radius: var(--radius-sm) !important;
-        color: var(--apple-text-primary) !important;
-        font-family: var(--font-apple) !important;
-        transition: var(--transition-apple) !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
-    }
-
-    div[data-baseweb="select"]:hover {
-        border-color: #B0B0B8 !important;
-    }
-
-    div[data-baseweb="select"] > div {
-        background: #FFFFFF !important;
-        color: #1D1D1F !important;
-        border-radius: var(--radius-sm) !important;
-    }
-
-    /* BaseWeb Popover Menus & Dropdown Options */
-    div[data-baseweb="popover"],
-    div[data-baseweb="menu"],
-    ul[role="listbox"] {
-        background: #FFFFFF !important;
-        border-radius: 12px !important;
-        border: 1px solid #E5E5EA !important;
-        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.12) !important;
-        color: #1D1D1F !important;
-        padding: 6px !important;
-    }
-
-    li[role="option"] {
-        background: #FFFFFF !important;
-        color: #1D1D1F !important;
-        font-family: var(--font-apple) !important;
-        font-size: 0.92rem !important;
-        border-radius: 8px !important;
-        padding: 8px 12px !important;
-        margin-bottom: 2px !important;
-        transition: var(--transition-apple) !important;
-    }
-
-    li[role="option"]:hover,
-    li[role="option"][aria-selected="true"] {
-        background: #F0F6FE !important;
-        color: #0071E3 !important;
-        font-weight: 500 !important;
-    }
-
-    /* Apple Squircle Border Containers */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: var(--apple-surface) !important;
-        border: 1px solid var(--apple-border) !important;
-        border-radius: 14px !important;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03) !important;
-        padding: 14px 18px !important;
-        margin-bottom: 12px !important;
-        transition: var(--transition-apple) !important;
-    }
-
-    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        border-color: #D2D2D7 !important;
-        box-shadow: var(--shadow-card) !important;
-        transform: translateY(-1px);
-    }
-
-    /* Apple Dropzone & Upload Button */
+    /* Holographic Intake Dropzone */
     [data-testid="stFileUploaderDropzone"] {
-        background: var(--apple-surface) !important;
-        border: 1.5px dashed #C7C7CC !important;
+        background: rgba(8, 14, 28, 0.65) !important;
+        border: 1.5px dashed rgba(0, 240, 255, 0.3) !important;
         border-radius: var(--radius-card) !important;
-        box-shadow: var(--shadow-subtle) !important;
-        transition: var(--transition-apple) !important;
-        padding: 22px 18px !important;
-        cursor: pointer !important;
+        box-shadow: var(--shadow-hud) !important;
+        transition: var(--transition-smooth) !important;
+        padding: 24px 18px !important;
+        position: relative;
+        overflow: hidden;
     }
 
     [data-testid="stFileUploaderDropzone"]:hover {
-        background: var(--apple-surface-hover) !important;
-        border-color: var(--apple-blue) !important;
-        box-shadow: 0 4px 18px rgba(0, 113, 227, 0.10) !important;
+        background: rgba(12, 20, 38, 0.8) !important;
+        border-color: #00F0FF !important;
+        box-shadow: 0 0 30px rgba(0, 240, 255, 0.25) !important;
     }
 
     [data-testid="stFileUploaderDropzone"] button,
     [data-testid="stFileUploader"] button[kind="secondary"] {
-        background: #EBF5FF !important;
-        color: var(--apple-blue) !important;
-        font-family: var(--font-apple);
+        background: rgba(0, 240, 255, 0.12) !important;
+        color: #00F0FF !important;
+        font-family: var(--font-mono) !important;
         font-weight: 600 !important;
-        font-size: 0.90rem !important;
-        letter-spacing: -0.01em !important;
-        border: 1px solid #CCE4FF !important;
+        font-size: 0.88rem !important;
+        border: 1px solid rgba(0, 240, 255, 0.4) !important;
         border-radius: var(--radius-pill) !important;
         padding: 8px 22px !important;
-        box-shadow: 0 1px 4px rgba(0, 113, 227, 0.12) !important;
-        transition: var(--transition-apple) !important;
-        cursor: pointer !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 6px !important;
-    }
-
-    [data-testid="stFileUploaderDropzone"] button [data-testid="stIconMaterial"],
-    [data-testid="stFileUploaderDropzone"] button .material-symbols-rounded {
-        font-family: "Material Symbols Rounded", "Material Symbols Outlined", "Material Icons" !important;
-        font-size: 1.15rem !important;
-        line-height: 1 !important;
-        display: inline-block !important;
-        vertical-align: middle !important;
+        box-shadow: 0 0 14px rgba(0, 240, 255, 0.18) !important;
+        transition: var(--transition-smooth) !important;
     }
 
     [data-testid="stFileUploaderDropzone"] button:hover,
     [data-testid="stFileUploader"] button[kind="secondary"]:hover {
-        background: var(--apple-blue) !important;
-        color: #FFFFFF !important;
-        border-color: var(--apple-blue) !important;
-        box-shadow: 0 4px 14px rgba(0, 113, 227, 0.35) !important;
+        background: #00F0FF !important;
+        color: #04060A !important;
+        border-color: #00F0FF !important;
+        box-shadow: 0 0 24px rgba(0, 240, 255, 0.6) !important;
         transform: translateY(-1px) !important;
     }
 
-    [data-testid="stFileUploaderDropzone"] button:active,
-    [data-testid="stFileUploader"] button[kind="secondary"]:active {
-        transform: scale(0.98) !important;
-    }
-
     [data-testid="stFileUploaderDropzoneInstructions"] {
-        color: var(--apple-text-secondary) !important;
-        font-family: var(--font-apple) !important;
+        color: var(--hud-text-secondary) !important;
+        font-family: var(--font-body) !important;
     }
-
     [data-testid="stFileUploaderDropzoneInstructions"] span {
-        color: var(--apple-text-primary) !important;
-        font-family: var(--font-apple) !important;
-        font-weight: 500 !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
     }
-
     [data-testid="stFileUploaderDropzoneInstructions"] small {
-        color: var(--apple-text-secondary) !important;
-        font-family: var(--font-apple) !important;
-        font-size: 0.82rem !important;
+        color: var(--hud-text-tertiary) !important;
+        font-family: var(--font-mono) !important;
     }
 
     [data-testid="stFileUploaderFile"] {
-        background: #FFFFFF !important;
-        border: 1px solid var(--apple-border) !important;
-        border-radius: 12px !important;
-        padding: 10px 14px !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
-        margin-top: 8px !important;
+        background: rgba(10, 16, 32, 0.85) !important;
+        border: 1px solid rgba(0, 240, 255, 0.2) !important;
+        border-radius: 10px !important;
+        color: #F0F6FC !important;
+        box-shadow: var(--shadow-hud-sm) !important;
     }
 
-    [data-testid="stFileUploaderDeleteBtn"] {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 4px !important;
-        color: #86868B !important;
-        border-radius: 50% !important;
-    }
-
-    [data-testid="stFileUploaderDeleteBtn"]:hover {
-        background: #F2F2F7 !important;
-        color: #FF3B30 !important;
-    }
-
-    /* Apple Vibrant Progress Bars */
-    .stProgress > div > div > div > div {
-        background: linear-gradient(90deg, #0071E3 0%, #34C759 100%) !important;
-        border-radius: var(--radius-pill) !important;
-    }
-
-    .stProgress > div > div > div {
-        background: #E5E5EA !important;
-        border-radius: var(--radius-pill) !important;
-    }
-
-    /* Bright Apple Notification Cards */
-    .stAlert, div[data-testid="stNotification"] {
-        background: var(--apple-surface) !important;
-        border: 1px solid var(--apple-border) !important;
-        border-left: 4px solid var(--apple-blue) !important;
+    /* Text Inputs & Selectboxes */
+    .stTextInput input {
+        background: rgba(8, 14, 28, 0.85) !important;
+        border: 1px solid rgba(0, 240, 255, 0.2) !important;
         border-radius: var(--radius-sm) !important;
-        color: var(--apple-text-primary) !important;
-        box-shadow: var(--shadow-card) !important;
+        color: #FFFFFF !important;
+        font-family: var(--font-body) !important;
+        font-size: 0.95rem !important;
+        transition: var(--transition-smooth) !important;
+    }
+    .stTextInput input:focus {
+        border-color: #00F0FF !important;
+        box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.25), 0 0 16px rgba(0, 240, 255, 0.2) !important;
+        outline: none !important;
     }
 
-    /* Apple Pastel Pill Badges */
+    div[data-baseweb="select"] {
+        background: rgba(8, 14, 28, 0.85) !important;
+        border: 1px solid rgba(0, 240, 255, 0.2) !important;
+        border-radius: var(--radius-sm) !important;
+        color: #FFFFFF !important;
+        transition: var(--transition-smooth) !important;
+    }
+    div[data-baseweb="select"]:hover {
+        border-color: rgba(0, 240, 255, 0.45) !important;
+    }
+    div[data-baseweb="select"] > div {
+        background: transparent !important;
+        color: #FFFFFF !important;
+    }
+
+    div[data-baseweb="popover"],
+    div[data-baseweb="menu"],
+    ul[role="listbox"] {
+        background: #080C16 !important;
+        border: 1px solid rgba(0, 240, 255, 0.3) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9), 0 0 24px rgba(0, 240, 255, 0.15) !important;
+        color: #FFFFFF !important;
+        padding: 6px !important;
+    }
+
+    li[role="option"] {
+        background: transparent !important;
+        color: var(--hud-text-secondary) !important;
+        font-family: var(--font-body) !important;
+        font-size: 0.92rem !important;
+        border-radius: 8px !important;
+        padding: 9px 12px !important;
+        margin-bottom: 2px !important;
+        transition: var(--transition-smooth) !important;
+    }
+    li[role="option"]:hover,
+    li[role="option"][aria-selected="true"] {
+        background: rgba(0, 240, 255, 0.12) !important;
+        color: #00F0FF !important;
+        font-weight: 600 !important;
+    }
+
+    /* Card Container (Border Wrapper) */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: var(--hud-bg-card) !important;
+        backdrop-filter: blur(16px) !important;
+        border: 1px solid var(--hud-border) !important;
+        border-radius: var(--radius-card) !important;
+        box-shadow: var(--shadow-hud) !important;
+        padding: 16px 20px !important;
+        margin-bottom: 14px !important;
+        transition: var(--transition-smooth) !important;
+        position: relative;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        border-color: rgba(0, 240, 255, 0.35) !important;
+        box-shadow: var(--shadow-hud-glow) !important;
+        transform: translateY(-2px);
+    }
+
+    /* Tactical Breadcrumb Bar */
+    .breadcrumb-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        background: rgba(8, 14, 28, 0.85);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(0, 240, 255, 0.25);
+        border-radius: var(--radius-pill);
+        padding: 8px 18px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow-hud-sm);
+    }
+    .bc-node {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        font-weight: 500;
+        color: var(--hud-text-secondary);
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .bc-node b {
+        color: #FFFFFF;
+        font-weight: 600;
+    }
+    .bc-node.active {
+        color: #00F0FF;
+        font-weight: 600;
+    }
+    .bc-node.active b {
+        color: #00F0FF;
+        text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+    }
+    .bc-sep {
+        color: rgba(0, 240, 255, 0.35);
+        font-size: 0.82rem;
+        user-select: none;
+    }
+
+    /* GeoScore Benchmark Card */
+    .geo-score-card {
+        background: rgba(8, 14, 28, 0.85);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(0, 240, 255, 0.22);
+        border-left: 4px solid #00F0FF;
+        border-radius: var(--radius-card);
+        padding: 16px 20px;
+        box-shadow: var(--shadow-hud-glow);
+        margin: 14px 0 18px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+    }
+    .score-title {
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--hud-text-secondary);
+    }
+    .score-pts {
+        font-family: var(--font-mono);
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #FFFFFF;
+        letter-spacing: -0.02em;
+        text-shadow: 0 0 16px rgba(0, 240, 255, 0.35);
+    }
+    .score-badge {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: var(--radius-pill);
+        background: rgba(0, 240, 255, 0.12);
+        color: #00F0FF;
+        border: 1px solid rgba(0, 240, 255, 0.35);
+        box-shadow: 0 0 12px rgba(0, 240, 255, 0.2);
+    }
+
+    /* Geo Clue Inspector Card */
+    .clue-inspector-card {
+        background: rgba(8, 14, 28, 0.85);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(0, 240, 255, 0.2);
+        border-radius: var(--radius-card);
+        padding: 16px 20px;
+        box-shadow: var(--shadow-hud);
+        margin: 14px 0;
+    }
+    .clue-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(0, 240, 255, 0.08);
+        font-size: 0.86rem;
+    }
+    .clue-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+    .clue-label {
+        font-family: var(--font-display);
+        font-weight: 600;
+        color: var(--hud-text-primary);
+        font-size: 0.86rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .clue-val {
+        font-family: var(--font-mono);
+        color: #00F0FF;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-align: right;
+    }
+
+    /* Badges */
     .clue-badge {
         display: inline-flex;
         align-items: center;
         padding: 5px 13px;
         border-radius: var(--radius-pill);
-        font-family: var(--font-apple);
+        font-family: var(--font-mono);
         font-size: 0.80rem;
         font-weight: 600;
         margin-right: 8px;
         margin-bottom: 8px;
-        transition: var(--transition-apple);
+        transition: var(--transition-smooth);
         letter-spacing: -0.01em;
     }
-
     .clue-badge:hover {
         transform: translateY(-1px);
+        box-shadow: 0 0 12px currentColor;
     }
-
     .badge-left {
-        background: #EBF5FF;
-        color: #0071E3;
-        border: 1px solid #CCE4FF;
+        background: rgba(0, 240, 255, 0.1);
+        color: #00F0FF;
+        border: 1px solid rgba(0, 240, 255, 0.3);
     }
-
     .badge-right {
-        background: #FFF4E6;
-        color: #E06C00;
-        border: 1px solid #FFE0B2;
+        background: rgba(255, 184, 0, 0.1);
+        color: #FFB800;
+        border: 1px solid rgba(255, 184, 0, 0.3);
     }
-
     .badge-cat {
-        background: #F4EFFF;
-        color: #5856D6;
-        border: 1px solid #E1D4FF;
+        background: rgba(112, 0, 255, 0.14);
+        color: #B47CFF;
+        border: 1px solid rgba(112, 0, 255, 0.35);
     }
 
-    /* Folium Map Container in Clean Apple Frame */
+    /* Folium Map Radar Frame */
     iframe {
         border-radius: var(--radius-card) !important;
-        border: 1px solid var(--apple-border) !important;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+        border: 1px solid rgba(0, 240, 255, 0.25) !important;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 240, 255, 0.15) !important;
         width: 100% !important;
         display: block !important;
-        transition: var(--transition-apple);
+        transition: var(--transition-smooth);
     }
-
     iframe:hover {
-        border-color: #C7C7CC !important;
-        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.09) !important;
+        border-color: rgba(0, 240, 255, 0.5) !important;
+        box-shadow: 0 16px 50px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 240, 255, 0.25) !important;
     }
 
     /* Image Element Frame */
     [data-testid="stImage"] img {
         border-radius: var(--radius-card) !important;
-        border: 1px solid var(--apple-border) !important;
-        box-shadow: var(--shadow-card) !important;
+        border: 1px solid rgba(0, 240, 255, 0.18) !important;
+        box-shadow: var(--shadow-hud) !important;
+        transition: var(--transition-smooth);
+    }
+    [data-testid="stImage"] img:hover {
+        border-color: rgba(0, 240, 255, 0.4) !important;
+        box-shadow: var(--shadow-hud-glow) !important;
     }
 
     /* Clean Subtle Dividers */
     hr {
         border: none !important;
         height: 1px !important;
-        background: var(--apple-border) !important;
+        background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.25), transparent) !important;
         margin: 24px 0 !important;
     }
 
-    /* Radio Buttons in Card Group */
+    /* Radio Group */
     div[data-testid="stRadio"] > div {
-        background: #FFFFFF !important;
-        border: 1px solid #E5E5EA !important;
+        background: rgba(8, 14, 28, 0.75) !important;
+        border: 1px solid rgba(0, 240, 255, 0.18) !important;
         border-radius: 12px !important;
-        padding: 8px 14px !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+        padding: 10px 16px !important;
+        box-shadow: var(--shadow-hud-sm) !important;
     }
-
     div[data-testid="stRadio"] label {
-        font-family: var(--font-apple);
+        font-family: var(--font-body);
         font-size: 0.92rem;
-        color: var(--apple-text-primary) !important;
-        transition: var(--transition-apple);
+        color: var(--hud-text-primary) !important;
+        transition: var(--transition-smooth);
     }
-
     div[data-testid="stRadio"] label:hover {
-        color: var(--apple-blue) !important;
+        color: #00F0FF !important;
     }
 
     /* Spinner */
     [data-testid="stSpinner"] > div {
-        border-top-color: var(--apple-blue) !important;
+        border-top-color: #00F0FF !important;
+    }
+
+    /* Progress Bars */
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #00F0FF 0%, #00FFA3 100%) !important;
+        box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+        border-radius: var(--radius-pill) !important;
+    }
+    .stProgress > div > div > div {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-radius: var(--radius-pill) !important;
+    }
+
+    /* Alerts / Top Pick Banner */
+    .stAlert, div[data-testid="stNotification"] {
+        background: rgba(8, 14, 28, 0.88) !important;
+        backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(0, 240, 255, 0.25) !important;
+        border-left: 4px solid #00F0FF !important;
+        border-radius: var(--radius-sm) !important;
+        color: #F0F6FC !important;
+        box-shadow: var(--shadow-hud-glow) !important;
+    }
+
+    /* Multi-Breakpoint Ergonomic Responsiveness (360px, 768px, 1280px, 1920px) */
+    @media (max-width: 480px) {
+        .block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 1.2rem !important;
+        }
+        .main-header {
+            font-size: 1.85rem !important;
+            letter-spacing: -0.02em !important;
+        }
+        .main-subtitle {
+            font-size: 0.92rem !important;
+        }
+        .breadcrumb-bar {
+            padding: 6px 12px !important;
+            font-size: 0.78rem !important;
+        }
+        .geo-score-card {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 10px !important;
+        }
+        .stButton button, .stLinkButton a {
+            width: 100% !important;
+            min-height: 44px !important;
+        }
+    }
+
+    @media (min-width: 481px) and (max-width: 768px) {
+        .block-container {
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+        }
+        .stButton button, .stLinkButton a {
+            min-height: 44px !important;
+        }
+    }
+
+    @media (min-width: 769px) and (max-width: 1280px) {
+        .block-container {
+            max-width: 1180px !important;
+        }
+    }
+
+    @media (min-width: 1281px) {
+        .block-container {
+            max-width: 1360px !important;
+        }
     }
 
     /* Accessibility */
@@ -578,123 +930,274 @@ st.markdown("""
             transition-duration: 0.01ms !important;
             scroll-behavior: auto !important;
         }
+        #geo-hud-canvas, #geo-cursor-dot, #geo-cursor-ring {
+            display: none !important;
+        }
     }
 
-    /* Apple Hierarchical Geographic Breadcrumb */
-    .breadcrumb-bar {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 6px;
-        background: #FFFFFF;
-        border: 1px solid var(--apple-border);
-        border-radius: var(--radius-pill);
-        padding: 7px 16px;
-        margin-bottom: 14px;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+    /* Custom Cursor Elements */
+    #geo-cursor-dot, #geo-cursor-ring {
+        position: fixed;
+        pointer-events: none;
+        z-index: 9999999;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        transition: opacity 0.2s ease;
     }
-    .bc-node {
-        font-family: var(--font-apple);
-        font-size: 0.83rem;
-        font-weight: 500;
-        color: var(--apple-text-secondary);
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
+    #geo-cursor-dot {
+        width: 6px;
+        height: 6px;
+        background: #00F0FF;
+        box-shadow: 0 0 10px #00F0FF, 0 0 20px #00F0FF;
     }
-    .bc-node b {
-        color: var(--apple-text-primary);
-        font-weight: 600;
+    #geo-cursor-ring {
+        width: 36px;
+        height: 36px;
+        border: 1.5px solid rgba(0, 240, 255, 0.6);
+        box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+        transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+                    height 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+                    border-color 0.25s, background-color 0.25s;
     }
-    .bc-node.active {
-        color: var(--apple-blue);
-        font-weight: 600;
-    }
-    .bc-node.active b {
-        color: var(--apple-blue);
-    }
-    .bc-sep {
-        color: #C7C7CC;
-        font-size: 0.8rem;
-        user-select: none;
+    #geo-cursor-ring.active-hover {
+        width: 54px;
+        height: 54px;
+        border-color: #00FFA3;
+        background: rgba(0, 255, 163, 0.08);
+        box-shadow: 0 0 20px rgba(0, 255, 163, 0.4);
     }
 
-    /* Apple GeoScore Benchmark Card */
-    .geo-score-card {
-        background: #FFFFFF;
-        border: 1px solid #D2E4F9;
-        border-left: 4px solid var(--apple-blue);
-        border-radius: var(--radius-card);
-        padding: 14px 18px;
-        box-shadow: var(--shadow-card);
-        margin: 12px 0 16px 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .score-title {
-        font-family: var(--font-apple);
-        font-size: 0.76rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--apple-text-secondary);
-    }
-    .score-pts {
-        font-family: var(--font-apple);
-        font-size: 1.55rem;
-        font-weight: 700;
-        color: var(--apple-text-primary);
-        letter-spacing: -0.02em;
-    }
-    .score-badge {
-        font-family: var(--font-apple);
-        font-size: 0.82rem;
-        font-weight: 600;
-        padding: 5px 12px;
-        border-radius: var(--radius-pill);
-        background: #EBF5FF;
-        color: var(--apple-blue);
-        border: 1px solid #CCE4FF;
-    }
-
-    /* Geo Clue Inspector Card */
-    .clue-inspector-card {
-        background: #FFFFFF;
-        border: 1px solid var(--apple-border);
-        border-radius: var(--radius-card);
-        padding: 14px 18px;
-        box-shadow: var(--shadow-card);
-        margin: 12px 0;
-    }
-    .clue-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 7px 0;
-        border-bottom: 1px solid #F2F2F7;
-        font-size: 0.86rem;
-    }
-    .clue-row:last-child {
-        border-bottom: none;
-        padding-bottom: 0;
-    }
-    .clue-label {
-        font-weight: 600;
-        color: var(--apple-text-primary);
-        font-size: 0.84rem;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-    .clue-val {
-        color: var(--apple-blue);
-        font-weight: 600;
-        font-size: 0.84rem;
-        text-align: right;
+    @media (hover: none) and (pointer: coarse) {
+        #geo-cursor-dot, #geo-cursor-ring {
+            display: none !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Client-Side Interactive Engine (Starfield Canvas, Animated Cursor, Spotlight, Decode Effect)
+components.html("""
+<script>
+(function() {
+    try {
+        const parentDoc = window.parent.document;
+        const parentWin = window.parent;
+        if (!parentDoc) return;
+
+        // 1. Scroll Progress Indicator
+        if (!parentDoc.getElementById("geo-scroll-progress")) {
+            const prog = parentDoc.createElement("div");
+            prog.id = "geo-scroll-progress";
+            parentDoc.body.appendChild(prog);
+        }
+
+        const updateScrollProgress = () => {
+            const prog = parentDoc.getElementById("geo-scroll-progress");
+            if (!prog) return;
+            const docEl = parentDoc.documentElement;
+            const scrollTotal = docEl.scrollHeight - parentWin.innerHeight;
+            const pct = scrollTotal > 0 ? (parentWin.scrollY / scrollTotal) * 100 : 0;
+            prog.style.width = Math.min(100, Math.max(0, pct)) + "%";
+        };
+        parentWin.addEventListener("scroll", updateScrollProgress, { passive: true });
+
+        // 2. Interactive Starfield & Tactical Radar Canvas
+        if (!parentDoc.getElementById("geo-hud-canvas")) {
+            const canvas = parentDoc.createElement("canvas");
+            canvas.id = "geo-hud-canvas";
+            canvas.style.position = "fixed";
+            canvas.style.top = "0";
+            canvas.style.left = "0";
+            canvas.style.width = "100vw";
+            canvas.style.height = "100vh";
+            canvas.style.zIndex = "-1";
+            canvas.style.pointerEvents = "none";
+            parentDoc.body.prepend(canvas);
+
+            const ctx = canvas.getContext("2d");
+            let width = (canvas.width = parentWin.innerWidth);
+            let height = (canvas.height = parentWin.innerHeight);
+
+            parentWin.addEventListener("resize", () => {
+                width = canvas.width = parentWin.innerWidth;
+                height = canvas.height = parentWin.innerHeight;
+            }, { passive: true });
+
+            const particleCount = parentWin.innerWidth < 768 ? 24 : 50;
+            const particles = [];
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4,
+                    radius: Math.random() * 1.6 + 0.9,
+                    alpha: Math.random() * 0.45 + 0.2
+                });
+            }
+
+            let mouse = { x: width * 0.5, y: height * 0.5, active: false };
+            parentDoc.addEventListener("mousemove", (e) => {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+                mouse.active = true;
+            }, { passive: true });
+
+            let radarAngle = 0;
+
+            const render = () => {
+                if (parentDoc.hidden) {
+                    requestAnimationFrame(render);
+                    return;
+                }
+                ctx.clearRect(0, 0, width, height);
+
+                // Faint Orbital Radar Concentric Rings in Upper Right
+                const radarX = width * 0.88;
+                const radarY = height * 0.22;
+                radarAngle += 0.003;
+
+                ctx.save();
+                ctx.strokeStyle = "rgba(0, 240, 255, 0.035)";
+                ctx.lineWidth = 1;
+                [80, 160, 240, 320].forEach((r) => {
+                    ctx.beginPath();
+                    ctx.arc(radarX, radarY, r, 0, Math.PI * 2);
+                    ctx.stroke();
+                });
+                const sweepLen = 320;
+                ctx.beginPath();
+                ctx.moveTo(radarX, radarY);
+                ctx.lineTo(radarX + Math.cos(radarAngle) * sweepLen, radarY + Math.sin(radarAngle) * sweepLen);
+                ctx.strokeStyle = "rgba(0, 240, 255, 0.07)";
+                ctx.stroke();
+                ctx.restore();
+
+                // Particle Constellation
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    if (p.x < 0) p.x = width;
+                    else if (p.x > width) p.x = 0;
+                    if (p.y < 0) p.y = height;
+                    else if (p.y > height) p.y = 0;
+
+                    if (mouse.active) {
+                        const dx = mouse.x - p.x;
+                        const dy = mouse.y - p.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 130) {
+                            p.x -= (dx / dist) * 0.5;
+                            p.y -= (dy / dist) * 0.5;
+                        }
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(0, 240, 255, ${p.alpha})`;
+                    ctx.fill();
+
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const p2 = particles[j];
+                        const dx = p.x - p2.x;
+                        const dy = p.y - p2.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 110) {
+                            ctx.beginPath();
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.strokeStyle = `rgba(0, 240, 255, ${0.14 * (1 - dist / 110)})`;
+                            ctx.lineWidth = 0.65;
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                requestAnimationFrame(render);
+            };
+
+            const prefersReduced = parentWin.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            if (!prefersReduced) {
+                render();
+            }
+        }
+
+        // 3. Custom Animated Reticle Cursor
+        const isTouch = ("ontouchstart" in parentWin) || (navigator.maxTouchPoints > 0);
+        if (!isTouch && !parentDoc.getElementById("geo-cursor-dot")) {
+            const dot = parentDoc.createElement("div");
+            dot.id = "geo-cursor-dot";
+            const ring = parentDoc.createElement("div");
+            ring.id = "geo-cursor-ring";
+            parentDoc.body.appendChild(dot);
+            parentDoc.body.appendChild(ring);
+
+            let mouseX = -100, mouseY = -100;
+            let ringX = -100, ringY = -100;
+
+            parentDoc.addEventListener("mousemove", (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                dot.style.left = mouseX + "px";
+                dot.style.top = mouseY + "px";
+            }, { passive: true });
+
+            const cursorLoop = () => {
+                ringX += (mouseX - ringX) * 0.18;
+                ringY += (mouseY - ringY) * 0.18;
+                ring.style.left = ringX + "px";
+                ring.style.top = ringY + "px";
+                requestAnimationFrame(cursorLoop);
+            };
+            cursorLoop();
+
+            parentDoc.addEventListener("mouseover", (e) => {
+                const target = e.target;
+                if (target.closest("button, a, input, select, [role='button'], [data-testid='stMetric'], .stSelectbox, .stFileUploader, iframe")) {
+                    ring.classList.add("active-hover");
+                }
+            }, { passive: true });
+
+            parentDoc.addEventListener("mouseout", (e) => {
+                const target = e.target;
+                if (target.closest("button, a, input, select, [role='button'], [data-testid='stMetric'], .stSelectbox, .stFileUploader, iframe")) {
+                    ring.classList.remove("active-hover");
+                }
+            }, { passive: true });
+        }
+
+        // 4. Header Scramble & Decode Animation
+        const headerEl = parentDoc.querySelector(".main-header");
+        if (headerEl && !headerEl.dataset.decoded) {
+            headerEl.dataset.decoded = "true";
+            const originalText = headerEl.innerText.trim();
+            const glyphs = "0101⌖◈∆ΞΨΩ⌗X_#+*~";
+            let iteration = 0;
+            const interval = setInterval(() => {
+                headerEl.innerText = originalText.split("").map((letter, index) => {
+                    if (index < iteration) {
+                        return originalText[index];
+                    }
+                    if (letter === " ") return " ";
+                    return glyphs[Math.floor(Math.random() * glyphs.length)];
+                }).join("");
+
+                if (iteration >= originalText.length) {
+                    clearInterval(interval);
+                    headerEl.innerText = originalText;
+                }
+                iteration += 1.6;
+            }, 30);
+        }
+
+    } catch (err) {
+        console.warn("HUD terminal client script initialized safely:", err);
+    }
+})();
+</script>
+""", height=0)
 
 CACHE_FILE = "embeddings_cache.pt"
 CORRECTIONS_FILE = "corrections_cache.pt"
@@ -1457,6 +1960,36 @@ with st.sidebar:
 st.markdown("<h1 class='main-header'>🌍 Global & Hyper-Local GeoGuessr AI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='main-subtitle'>Pins street view and outdoor landscape photos down to <b>exact global countries, Indian states, and Kerala village micro-regions</b> using multi-scale vision AI and satellite telemetry.</p>", unsafe_allow_html=True)
 
+# Tactical Telemetry Marquee Strip
+st.markdown("""
+<div class="hud-ticker-wrap">
+    <div class="hud-ticker-track">
+        <span>🛰️ SATELLITE ORBITAL FEED SYNCHRONIZED</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>475 GEODETIC SECTORS RECONNOITERED</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>RESIDUAL VISION ADAPTER LOCK: 100% TOP-1</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>KERALA MICRO-REGION RADAR ACTIVE</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>ZERO EXTERNAL API LATENCY</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>DUAL ORTHOPHOTO SATELLITE TELEMETRY</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>TACTICAL GROUND TRUTH VERIFIED</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>STREETCLIP EMBEDDINGS 768-D VECTOR MESH</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>🛰️ SATELLITE ORBITAL FEED SYNCHRONIZED</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>475 GEODETIC SECTORS RECONNOITERED</span>
+        <span class="hud-ticker-sep">◈</span>
+        <span>RESIDUAL VISION ADAPTER LOCK: 100% TOP-1</span>
+        <span class="hud-ticker-sep">◈</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 # Show correction success alert if just updated
 if "just_corrected" in st.session_state:
     corr = st.session_state["just_corrected"]
@@ -1646,9 +2179,9 @@ with col_right:
             <div class="geo-score-card">
                 <div>
                     <div class="score-title">🏆 GeoGuessr Match Score ({benchmark_source})</div>
-                    <div class="score-pts">{score:,} <span style="font-size:0.95rem; font-weight:500; color:var(--apple-text-secondary);">/ 5,000 pts</span></div>
-                    <div style="font-size:0.83rem; color:var(--apple-text-secondary); margin-top:3px;">
-                        Error: <b style="color:var(--apple-text-primary);">{dist_err:.1f} km</b> from authentic GPS coordinates
+                    <div class="score-pts">{score:,} <span style="font-size:0.95rem; font-weight:500; color:var(--hud-text-secondary);">/ 5,000 pts</span></div>
+                    <div style="font-size:0.83rem; color:var(--hud-text-secondary); margin-top:3px;">
+                        Error: <b style="color:var(--hud-text-primary);">{dist_err:.1f} km</b> from authentic GPS coordinates
                     </div>
                 </div>
                 <div>
@@ -1657,7 +2190,7 @@ with col_right:
             </div>
             """, unsafe_allow_html=True)
         else:
-            st.markdown("<div style='margin-bottom: 12px;'><span class='score-badge' style='background:#F2F2F7; color:#6E6E73; border-color:#E5E5EA;'>🛡️ Blind Evaluation: 100% Vision-Based Prediction (No EXIF GPS in photo)</span></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-bottom: 12px;'><span class='score-badge' style='background:rgba(0, 240, 255, 0.08); color:#00F0FF; border-color:rgba(0, 240, 255, 0.28); box-shadow:0 0 12px rgba(0,240,255,0.15);'>🛡️ Blind Evaluation: 100% Vision-Based Prediction (No EXIF GPS in photo)</span></div>", unsafe_allow_html=True)
             with st.expander("🎯 Benchmark AI Against Known Ground Truth", expanded=False):
                 st.caption("Select the known location where this photo was taken to calculate the model's distance error and GeoGuessr score:")
                 bench_choice = st.selectbox("Ground Truth Location:", [l["name"] for l in locations], key="bench_gt_loc")
@@ -1670,9 +2203,9 @@ with col_right:
                     <div class="geo-score-card">
                         <div>
                             <div class="score-title">🎯 Manual Ground Truth Score</div>
-                            <div class="score-pts">{score:,} <span style="font-size:0.95rem; font-weight:500; color:var(--apple-text-secondary);">/ 5,000 pts</span></div>
-                            <div style="font-size:0.83rem; color:var(--apple-text-secondary); margin-top:3px;">
-                                Error: <b style="color:var(--apple-text-primary);">{dist_err:.1f} km</b> to {bench_choice.split(',')[0]}
+                            <div class="score-pts">{score:,} <span style="font-size:0.95rem; font-weight:500; color:var(--hud-text-secondary);">/ 5,000 pts</span></div>
+                            <div style="font-size:0.83rem; color:var(--hud-text-secondary); margin-top:3px;">
+                                Error: <b style="color:var(--hud-text-primary);">{dist_err:.1f} km</b> to {bench_choice.split(',')[0]}
                             </div>
                         </div>
                         <div>
@@ -1771,13 +2304,13 @@ with col_right:
             m_gmaps, m_earth, _ = get_map_urls(item["lat"], item["lon"])
             
             popup_html = f"""
-            <div style='font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif; min-width:210px; background:#FFFFFF; color:#1D1D1F; padding:12px 14px; border-radius:12px; border:1px solid #E5E5EA; box-shadow:0 8px 24px rgba(0,0,0,0.12);'>
-                <b style='font-size:13px; color:#1D1D1F; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif; letter-spacing:-0.01em;'>#{i} {item['name']}</b><br/>
-                <span style='color:#86868B; font-size:11px;'>Confidence: <b style='color:#1D1D1F;'>{item['confidence']*100:.1f}%</b></span><br/>
-                <span style='color:#6E6E73; font-size:11px;'>Driving: <b style='color:#1D1D1F;'>{item['driving_side']}</b></span><br/>
-                <hr style='margin:8px 0; border:none; height:1px; background:#E5E5EA;'/>
-                <a href='{m_gmaps}' target='_blank' style='color:#0071E3; font-weight:600; text-decoration:none; margin-right:10px; font-size:11.5px;'>📍 Google Maps</a>
-                <a href='{m_earth}' target='_blank' style='color:#34C759; font-weight:600; text-decoration:none; font-size:11.5px;'>🌐 Google Earth</a>
+            <div style='font-family:"Plus Jakarta Sans",sans-serif; min-width:220px; background:#080D1A; color:#F0F6FC; padding:12px 14px; border-radius:10px; border:1px solid rgba(0,240,255,0.3); box-shadow:0 12px 36px rgba(0,0,0,0.85), 0 0 16px rgba(0,240,255,0.15);'>
+                <b style='font-size:13px; color:#00F0FF; font-family:"Space Grotesk",sans-serif; letter-spacing:-0.01em;'>#{i} {item['name']}</b><br/>
+                <span style='color:#8B9BB4; font-size:11px; font-family:"JetBrains Mono",monospace;'>Confidence: <b style='color:#FFFFFF;'>{item['confidence']*100:.1f}%</b></span><br/>
+                <span style='color:#52637A; font-size:11px; font-family:"JetBrains Mono",monospace;'>Driving: <b style='color:#00FFA3;'>{item['driving_side']}</b></span><br/>
+                <hr style='margin:8px 0; border:none; height:1px; background:rgba(0,240,255,0.18);'/>
+                <a href='{m_gmaps}' target='_blank' style='color:#00F0FF; font-weight:600; text-decoration:none; margin-right:10px; font-size:11.5px; font-family:"JetBrains Mono",monospace;'>📍 Google Maps</a>
+                <a href='{m_earth}' target='_blank' style='color:#00FFA3; font-weight:600; text-decoration:none; font-size:11.5px; font-family:"JetBrains Mono",monospace;'>🌐 Google Earth</a>
             </div>
             """
             
@@ -1799,7 +2332,7 @@ with col_right:
                 st.markdown(f"""
                 <div class="clue-row">
                     <span class="clue-label">{cr['category']}</span>
-                    <span class="clue-val">{cr['label']} <small style="color:var(--apple-text-secondary); font-weight:normal;">({cr['confidence']*100:.1f}%)</small></span>
+                    <span class="clue-val">{cr['label']} <small style="color:var(--hud-text-secondary); font-weight:normal;">({cr['confidence']*100:.1f}%)</small></span>
                 </div>
                 """, unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
@@ -1967,10 +2500,10 @@ with col_right:
 
                 # Display card confirming selection & duplicate prevention guarantee
                 st.markdown(
-                    f"<div style='background:#F2FAF5; border:1px solid #C6EED8; border-left:4px solid #34C759; padding:12px 16px; border-radius:12px; margin:8px 0 12px 0; box-shadow:0 2px 10px rgba(0,0,0,0.03);'>"
-                    f"<b style='color:#1D1D1F; font-family:-apple-system,BlinkMacSystemFont,\"SF Pro Text\",sans-serif;'>Selected Target:</b> <span style='color:#0071E3; font-weight:600;'>{matched_loc['name']}</span><br/>"
-                    f"<span style='color:#6E6E73; font-size:0.88rem;'>Category: <code style='background:#EBF5FF; color:#0071E3; border:1px solid #CCE4FF;'>{reg_category}</code> | Country: <b style='color:#1D1D1F;'>{reg_country}</b> | Region: <b style='color:#1D1D1F;'>{reg_region}</b> | Driving: <b style='color:#34C759;'>{reg_driving}</b></span><br/>"
-                    f"<span style='color:#248A3D; font-size:0.82rem; font-weight:600;'>🛡️ Duplicate Protection Active: Updates existing place in-place without duplicating.</span>"
+                    f"<div style='background:rgba(0, 255, 163, 0.08); border:1px solid rgba(0, 255, 163, 0.28); border-left:4px solid #00FFA3; padding:12px 16px; border-radius:12px; margin:8px 0 12px 0; box-shadow:0 0 20px rgba(0, 255, 163, 0.12);'>"
+                    f"<b style='color:#FFFFFF; font-family:var(--font-display);'>Selected Target:</b> <span style='color:#00F0FF; font-weight:600;'>{matched_loc['name']}</span><br/>"
+                    f"<span style='color:var(--hud-text-secondary); font-size:0.88rem;'>Category: <code style='background:rgba(0, 240, 255, 0.12); color:#00F0FF; border:1px solid rgba(0, 240, 255, 0.3);'>{reg_category}</code> | Country: <b style='color:#FFFFFF;'>{reg_country}</b> | Region: <b style='color:#FFFFFF;'>{reg_region}</b> | Driving: <b style='color:#00FFA3;'>{reg_driving}</b></span><br/>"
+                    f"<span style='color:#00FFA3; font-size:0.82rem; font-weight:600; font-family:var(--font-mono);'>🛡️ Duplicate Protection Active: Updates existing place in-place without duplicating.</span>"
                     f"</div>",
                     unsafe_allow_html=True
                 )
