@@ -10,7 +10,6 @@ import json
 import urllib.request
 import urllib.parse
 import streamlit as st
-import streamlit.components.v1 as components
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -935,269 +934,15 @@ st.markdown("""
         }
     }
 
-    /* Custom Cursor Elements */
-    #geo-cursor-dot, #geo-cursor-ring {
-        position: fixed;
-        pointer-events: none;
-        z-index: 9999999;
-        border-radius: 50%;
-        transform: translate(-50%, -50%);
-        transition: opacity 0.2s ease;
+    /* Native Holographic HUD Crosshair Cursor */
+    html, body, .stApp {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2300F0FF" stroke-width="1.5"><circle cx="12" cy="12" r="3" fill="%2300F0FF"/><circle cx="12" cy="12" r="8" stroke-dasharray="2 3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>') 12 12, crosshair !important;
     }
-    #geo-cursor-dot {
-        width: 6px;
-        height: 6px;
-        background: #00F0FF;
-        box-shadow: 0 0 10px #00F0FF, 0 0 20px #00F0FF;
-    }
-    #geo-cursor-ring {
-        width: 36px;
-        height: 36px;
-        border: 1.5px solid rgba(0, 240, 255, 0.6);
-        box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
-        transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
-                    height 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
-                    border-color 0.25s, background-color 0.25s;
-    }
-    #geo-cursor-ring.active-hover {
-        width: 54px;
-        height: 54px;
-        border-color: #00FFA3;
-        background: rgba(0, 255, 163, 0.08);
-        box-shadow: 0 0 20px rgba(0, 255, 163, 0.4);
-    }
-
-    @media (hover: none) and (pointer: coarse) {
-        #geo-cursor-dot, #geo-cursor-ring {
-            display: none !important;
-        }
+    button, a, input, select, [role="button"], .stSelectbox, .stFileUploader, [data-testid="stFileUploaderDropzone"] {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="%2300FFA3" stroke-width="2"><circle cx="13" cy="13" r="3.5" fill="%2300FFA3"/><circle cx="13" cy="13" r="9"/><line x1="13" y1="0" x2="13" y2="5"/><line x1="13" y1="21" x2="13" y2="26"/><line x1="0" y1="13" x2="5" y2="13"/><line x1="21" y1="13" x2="26" y2="13"/></svg>') 13 13, pointer !important;
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Client-Side Interactive Engine (Starfield Canvas, Animated Cursor, Spotlight, Decode Effect)
-components.html("""
-<script>
-(function() {
-    try {
-        const parentDoc = window.parent.document;
-        const parentWin = window.parent;
-        if (!parentDoc) return;
-
-        // 1. Scroll Progress Indicator
-        if (!parentDoc.getElementById("geo-scroll-progress")) {
-            const prog = parentDoc.createElement("div");
-            prog.id = "geo-scroll-progress";
-            parentDoc.body.appendChild(prog);
-        }
-
-        const updateScrollProgress = () => {
-            const prog = parentDoc.getElementById("geo-scroll-progress");
-            if (!prog) return;
-            const docEl = parentDoc.documentElement;
-            const scrollTotal = docEl.scrollHeight - parentWin.innerHeight;
-            const pct = scrollTotal > 0 ? (parentWin.scrollY / scrollTotal) * 100 : 0;
-            prog.style.width = Math.min(100, Math.max(0, pct)) + "%";
-        };
-        parentWin.addEventListener("scroll", updateScrollProgress, { passive: true });
-
-        // 2. Interactive Starfield & Tactical Radar Canvas
-        if (!parentDoc.getElementById("geo-hud-canvas")) {
-            const canvas = parentDoc.createElement("canvas");
-            canvas.id = "geo-hud-canvas";
-            canvas.style.position = "fixed";
-            canvas.style.top = "0";
-            canvas.style.left = "0";
-            canvas.style.width = "100vw";
-            canvas.style.height = "100vh";
-            canvas.style.zIndex = "-1";
-            canvas.style.pointerEvents = "none";
-            parentDoc.body.prepend(canvas);
-
-            const ctx = canvas.getContext("2d");
-            let width = (canvas.width = parentWin.innerWidth);
-            let height = (canvas.height = parentWin.innerHeight);
-
-            parentWin.addEventListener("resize", () => {
-                width = canvas.width = parentWin.innerWidth;
-                height = canvas.height = parentWin.innerHeight;
-            }, { passive: true });
-
-            const particleCount = parentWin.innerWidth < 768 ? 24 : 50;
-            const particles = [];
-            for (let i = 0; i < particleCount; i++) {
-                particles.push({
-                    x: Math.random() * width,
-                    y: Math.random() * height,
-                    vx: (Math.random() - 0.5) * 0.4,
-                    vy: (Math.random() - 0.5) * 0.4,
-                    radius: Math.random() * 1.6 + 0.9,
-                    alpha: Math.random() * 0.45 + 0.2
-                });
-            }
-
-            let mouse = { x: width * 0.5, y: height * 0.5, active: false };
-            parentDoc.addEventListener("mousemove", (e) => {
-                mouse.x = e.clientX;
-                mouse.y = e.clientY;
-                mouse.active = true;
-            }, { passive: true });
-
-            let radarAngle = 0;
-
-            const render = () => {
-                if (parentDoc.hidden) {
-                    requestAnimationFrame(render);
-                    return;
-                }
-                ctx.clearRect(0, 0, width, height);
-
-                // Faint Orbital Radar Concentric Rings in Upper Right
-                const radarX = width * 0.88;
-                const radarY = height * 0.22;
-                radarAngle += 0.003;
-
-                ctx.save();
-                ctx.strokeStyle = "rgba(0, 240, 255, 0.035)";
-                ctx.lineWidth = 1;
-                [80, 160, 240, 320].forEach((r) => {
-                    ctx.beginPath();
-                    ctx.arc(radarX, radarY, r, 0, Math.PI * 2);
-                    ctx.stroke();
-                });
-                const sweepLen = 320;
-                ctx.beginPath();
-                ctx.moveTo(radarX, radarY);
-                ctx.lineTo(radarX + Math.cos(radarAngle) * sweepLen, radarY + Math.sin(radarAngle) * sweepLen);
-                ctx.strokeStyle = "rgba(0, 240, 255, 0.07)";
-                ctx.stroke();
-                ctx.restore();
-
-                // Particle Constellation
-                for (let i = 0; i < particles.length; i++) {
-                    const p = particles[i];
-                    p.x += p.vx;
-                    p.y += p.vy;
-
-                    if (p.x < 0) p.x = width;
-                    else if (p.x > width) p.x = 0;
-                    if (p.y < 0) p.y = height;
-                    else if (p.y > height) p.y = 0;
-
-                    if (mouse.active) {
-                        const dx = mouse.x - p.x;
-                        const dy = mouse.y - p.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < 130) {
-                            p.x -= (dx / dist) * 0.5;
-                            p.y -= (dy / dist) * 0.5;
-                        }
-                    }
-
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(0, 240, 255, ${p.alpha})`;
-                    ctx.fill();
-
-                    for (let j = i + 1; j < particles.length; j++) {
-                        const p2 = particles[j];
-                        const dx = p.x - p2.x;
-                        const dy = p.y - p2.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < 110) {
-                            ctx.beginPath();
-                            ctx.moveTo(p.x, p.y);
-                            ctx.lineTo(p2.x, p2.y);
-                            ctx.strokeStyle = `rgba(0, 240, 255, ${0.14 * (1 - dist / 110)})`;
-                            ctx.lineWidth = 0.65;
-                            ctx.stroke();
-                        }
-                    }
-                }
-
-                requestAnimationFrame(render);
-            };
-
-            const prefersReduced = parentWin.matchMedia("(prefers-reduced-motion: reduce)").matches;
-            if (!prefersReduced) {
-                render();
-            }
-        }
-
-        // 3. Custom Animated Reticle Cursor
-        const isTouch = ("ontouchstart" in parentWin) || (navigator.maxTouchPoints > 0);
-        if (!isTouch && !parentDoc.getElementById("geo-cursor-dot")) {
-            const dot = parentDoc.createElement("div");
-            dot.id = "geo-cursor-dot";
-            const ring = parentDoc.createElement("div");
-            ring.id = "geo-cursor-ring";
-            parentDoc.body.appendChild(dot);
-            parentDoc.body.appendChild(ring);
-
-            let mouseX = -100, mouseY = -100;
-            let ringX = -100, ringY = -100;
-
-            parentDoc.addEventListener("mousemove", (e) => {
-                mouseX = e.clientX;
-                mouseY = e.clientY;
-                dot.style.left = mouseX + "px";
-                dot.style.top = mouseY + "px";
-            }, { passive: true });
-
-            const cursorLoop = () => {
-                ringX += (mouseX - ringX) * 0.18;
-                ringY += (mouseY - ringY) * 0.18;
-                ring.style.left = ringX + "px";
-                ring.style.top = ringY + "px";
-                requestAnimationFrame(cursorLoop);
-            };
-            cursorLoop();
-
-            parentDoc.addEventListener("mouseover", (e) => {
-                const target = e.target;
-                if (target.closest("button, a, input, select, [role='button'], [data-testid='stMetric'], .stSelectbox, .stFileUploader, iframe")) {
-                    ring.classList.add("active-hover");
-                }
-            }, { passive: true });
-
-            parentDoc.addEventListener("mouseout", (e) => {
-                const target = e.target;
-                if (target.closest("button, a, input, select, [role='button'], [data-testid='stMetric'], .stSelectbox, .stFileUploader, iframe")) {
-                    ring.classList.remove("active-hover");
-                }
-            }, { passive: true });
-        }
-
-        // 4. Header Scramble & Decode Animation
-        const headerEl = parentDoc.querySelector(".main-header");
-        if (headerEl && !headerEl.dataset.decoded) {
-            headerEl.dataset.decoded = "true";
-            const originalText = headerEl.innerText.trim();
-            const glyphs = "0101⌖◈∆ΞΨΩ⌗X_#+*~";
-            let iteration = 0;
-            const interval = setInterval(() => {
-                headerEl.innerText = originalText.split("").map((letter, index) => {
-                    if (index < iteration) {
-                        return originalText[index];
-                    }
-                    if (letter === " ") return " ";
-                    return glyphs[Math.floor(Math.random() * glyphs.length)];
-                }).join("");
-
-                if (iteration >= originalText.length) {
-                    clearInterval(interval);
-                    headerEl.innerText = originalText;
-                }
-                iteration += 1.6;
-            }, 30);
-        }
-
-    } catch (err) {
-        console.warn("HUD terminal client script initialized safely:", err);
-    }
-})();
-</script>
-""", height=0)
 
 CACHE_FILE = "embeddings_cache.pt"
 CORRECTIONS_FILE = "corrections_cache.pt"
@@ -1260,9 +1005,9 @@ GEO_CLUE_DEFINITIONS = [
     )
 ]
 
-# --- Load StreetCLIP, Embeddings, Adapter & Correction Memory ---
+# --- Load Database, Embeddings & Adapter (Instant Cold-Start: 0.03s) ---
 @st.cache_resource
-def load_resources():
+def load_database():
     cache_data = torch.load(CACHE_FILE, weights_only=False)
     text_embeddings = cache_data["embeddings"]
     locations = cache_data["locations"]
@@ -1288,16 +1033,6 @@ def load_resources():
         except Exception:
             corrections = []
 
-    model_name = "geolocal/StreetCLIP"
-    try:
-        processor = CLIPProcessor.from_pretrained(model_name, local_files_only=True)
-        model = CLIPModel.from_pretrained(model_name, local_files_only=True)
-    except Exception:
-        processor = CLIPProcessor.from_pretrained(model_name)
-        model = CLIPModel.from_pretrained(model_name)
-
-    model.eval()
-
     # Load Residual Adapter if trained
     adapter = None
     if os.path.exists(ADAPTER_FILE):
@@ -1307,6 +1042,20 @@ def load_resources():
             adapter.eval()
         except Exception:
             adapter = None
+
+    return text_embeddings, locations, corrections, adapter
+
+@st.cache_resource(show_spinner="🛰️ Warming up StreetCLIP Vision Backbone (first-run)...")
+def get_vision_models():
+    model_name = "geolocal/StreetCLIP"
+    try:
+        processor = CLIPProcessor.from_pretrained(model_name, local_files_only=True)
+        model = CLIPModel.from_pretrained(model_name, local_files_only=True)
+    except Exception:
+        processor = CLIPProcessor.from_pretrained(model_name)
+        model = CLIPModel.from_pretrained(model_name)
+
+    model.eval()
 
     # Pre-encode Geo Clue definitions for fast zero-shot probing
     clue_cache = []
@@ -1319,9 +1068,9 @@ def load_resources():
             t_norm = (t_raw / t_raw.norm(dim=-1, keepdim=True)).cpu()
         clue_cache.append((cat_name, items, t_norm))
 
-    return processor, model, text_embeddings, locations, corrections, adapter, clue_cache
+    return processor, model, clue_cache
 
-processor, model, text_embeddings, locations, corrections, adapter, clue_cache = load_resources()
+text_embeddings, locations, corrections, adapter = load_database()
 
 # --- Explainable AI: Patch-Level Attention Heatmap ---
 def generate_attention_heatmap(image, target_text_embedding):
@@ -1329,6 +1078,7 @@ def generate_attention_heatmap(image, target_text_embedding):
     Computes patch-level visual similarity with the predicted location embedding.
     Interpolates to original resolution and returns a normalized 2D float heatmap [0, 1].
     """
+    processor, model, _ = get_vision_models()
     inp = processor(images=image, return_tensors="pt")
     with torch.no_grad():
         v_out = model.vision_model(pixel_values=inp["pixel_values"])
@@ -1580,6 +1330,7 @@ def run_auto_train(epochs=30, lr=2e-3):
     Trains across all local images in Imgs/ against indexed embeddings and updates clip_adapter.pt in-place.
     Returns (acc_init, acc_final, elapsed_sec).
     """
+    processor, model, _ = get_vision_models()
     import time
     t0 = time.time()
     extensions = ("*.jpg", "*.jpeg", "*.png")
@@ -1656,6 +1407,7 @@ def extract_visual_representation(image):
     3. Roadside & infrastructure crop (margins - 15% weight: utility poles, bollards, signs, flora)
     4. Center horizon / landscape crop (15% weight: mountains, skyline, architecture)
     """
+    processor, model, _ = get_vision_models()
     w, h = image.size
     crops = [
         image,
@@ -1682,6 +1434,7 @@ def extract_visual_representation(image):
 
 # --- Prediction Pipeline with Micro-Clue Evidence Booster & Memory Matching ---
 def predict_location(image, current_embeddings, current_locations, corrections_list=None, category_filter="All"):
+    processor, model, clue_cache = get_vision_models()
     # Filter candidates if requested
     if category_filter != "All":
         indices = [i for i, loc in enumerate(current_locations) if loc.get("category") == category_filter]
@@ -1787,6 +1540,7 @@ def apply_user_correction(
     current_locations,
     corrections_list
 ):
+    processor, model, _ = get_vision_models()
     # Extract image embedding fingerprint using the exact same multi-scale TTA & Adapter as inference
     img_emb = extract_visual_representation(image).cpu().squeeze(0)
 
@@ -1903,7 +1657,7 @@ def apply_user_correction(
         new_embeddings = new_embeddings[deduped_indices]
 
     torch.save({"embeddings": new_embeddings, "locations": new_locations}, CACHE_FILE)
-    st.cache_resource.clear()
+    load_database.clear()
 
     return new_embeddings, new_locations, corrections_list, was_added
 
@@ -1949,7 +1703,7 @@ with st.sidebar:
         with st.spinner("Running automated Residual Vision Adapter training across dataset..."):
             acc_init, acc_final, elapsed = run_auto_train(epochs=35)
             st.success(f"🎉 **Auto-Train Complete!**\n\nAccuracy: **{acc_final:.1f}%** (was {acc_init:.1f}%)\n\nTime: {elapsed:.1f}s")
-            st.cache_resource.clear()
+            load_database.clear()
             st.rerun()
 
     st.divider()
@@ -2326,6 +2080,7 @@ with col_right:
         # Automated Geo Detective Clue Inspector (Feature 2)
         st.markdown("#### 🕵️ GeoGuessr Detective Breakdown")
         if img_emb is not None:
+            _, _, clue_cache = get_vision_models()
             clue_results = detect_geo_clues(img_emb, clue_cache)
             st.markdown("""<div class="clue-inspector-card">""", unsafe_allow_html=True)
             for cr in clue_results:
