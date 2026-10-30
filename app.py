@@ -98,7 +98,7 @@ st.markdown("""
     }
 
     /* Deep Space Terminal Background with Quantum Gradients */
-    .stApp {
+    html, body, .stApp, [data-testid="stAppViewContainer"] {
         background-color: var(--hud-bg-void) !important;
         background-image: 
             radial-gradient(ellipse 90% 40% at 50% -10%, rgba(0, 240, 255, 0.12), transparent 70%),
@@ -109,34 +109,7 @@ st.markdown("""
         font-family: var(--font-body) !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        overflow-x: hidden !important;
-        position: relative;
-    }
-
-    /* Subtle CRT Micro-Scanlines Overlay */
-    .stApp::before {
-        content: "";
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.18) 50%);
-        background-size: 100% 4px;
-        z-index: 999990;
-        pointer-events: none;
-        opacity: 0.65;
-    }
-
-    /* Scroll Progress Line Indicator */
-    #geo-scroll-progress {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 2px;
-        width: 0%;
-        background: linear-gradient(90deg, #00F0FF, #7000FF, #00FFA3);
-        box-shadow: 0 0 10px #00F0FF;
-        z-index: 999999;
-        pointer-events: none;
-        transition: width 0.08s linear;
+        min-height: 100vh;
     }
 
     /* Hide Streamlit Clutter Chrome */
@@ -169,24 +142,7 @@ st.markdown("""
         text-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
     }
 
-    /* Tactical Left Accent Bar on Headings */
-    h2, h3 {
-        position: relative;
-        padding-left: 12px;
-    }
-    h2::before, h3::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 20%;
-        height: 60%;
-        width: 3px;
-        background: #00F0FF;
-        box-shadow: 0 0 10px #00F0FF;
-        border-radius: 2px;
-    }
-
-    p, label, span, div {
+    p, label {
         font-family: var(--font-body);
         color: var(--hud-text-primary);
     }
@@ -259,6 +215,13 @@ st.markdown("""
         text-shadow: 0 0 40px rgba(0, 240, 255, 0.4);
         position: relative;
     }
+    .main-header .header-globe {
+        -webkit-text-fill-color: initial !important;
+        background: none !important;
+        -webkit-background-clip: initial !important;
+        display: inline-block;
+        margin-right: 8px;
+    }
 
     .main-subtitle {
         font-family: var(--font-body) !important;
@@ -327,12 +290,12 @@ st.markdown("""
     [data-testid="stSidebar"] h4 {
         font-family: var(--font-display) !important;
         color: var(--hud-cyan) !important;
-        font-size: 1.15rem !important;
-        letter-spacing: 0.02em !important;
+        font-size: 0.95rem !important;
+        letter-spacing: 0.04em !important;
         text-transform: uppercase;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
     }
 
     [data-testid="stSidebar"] hr {
@@ -502,9 +465,14 @@ st.markdown("""
         border-radius: var(--radius-card) !important;
         box-shadow: var(--shadow-hud) !important;
         transition: var(--transition-smooth) !important;
-        padding: 24px 18px !important;
+        padding: 22px 18px !important;
         position: relative;
-        overflow: hidden;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 10px !important;
+        text-align: center !important;
     }
 
     [data-testid="stFileUploaderDropzone"]:hover {
@@ -515,14 +483,18 @@ st.markdown("""
 
     [data-testid="stFileUploaderDropzone"] button,
     [data-testid="stFileUploader"] button[kind="secondary"] {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
         background: rgba(0, 240, 255, 0.12) !important;
         color: #00F0FF !important;
-        font-family: var(--font-mono) !important;
+        font-family: var(--font-body) !important;
         font-weight: 600 !important;
-        font-size: 0.88rem !important;
+        font-size: 0.90rem !important;
         border: 1px solid rgba(0, 240, 255, 0.4) !important;
         border-radius: var(--radius-pill) !important;
-        padding: 8px 22px !important;
+        padding: 8px 24px !important;
         box-shadow: 0 0 14px rgba(0, 240, 255, 0.18) !important;
         transition: var(--transition-smooth) !important;
     }
@@ -558,7 +530,8 @@ st.markdown("""
     }
 
     /* Text Inputs & Selectboxes */
-    .stTextInput input {
+    .stTextInput input,
+    .react-aria-ComboBox input {
         background: rgba(8, 14, 28, 0.85) !important;
         border: 1px solid rgba(0, 240, 255, 0.2) !important;
         border-radius: var(--radius-sm) !important;
@@ -567,20 +540,23 @@ st.markdown("""
         font-size: 0.95rem !important;
         transition: var(--transition-smooth) !important;
     }
-    .stTextInput input:focus {
+    .stTextInput input:focus,
+    .react-aria-ComboBox input:focus {
         border-color: #00F0FF !important;
         box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.25), 0 0 16px rgba(0, 240, 255, 0.2) !important;
         outline: none !important;
     }
 
-    div[data-baseweb="select"] {
+    div[data-baseweb="select"],
+    .react-aria-ComboBox {
         background: rgba(8, 14, 28, 0.85) !important;
         border: 1px solid rgba(0, 240, 255, 0.2) !important;
         border-radius: var(--radius-sm) !important;
         color: #FFFFFF !important;
         transition: var(--transition-smooth) !important;
     }
-    div[data-baseweb="select"]:hover {
+    div[data-baseweb="select"]:hover,
+    .react-aria-ComboBox:hover {
         border-color: rgba(0, 240, 255, 0.45) !important;
     }
     div[data-baseweb="select"] > div {
@@ -590,7 +566,9 @@ st.markdown("""
 
     div[data-baseweb="popover"],
     div[data-baseweb="menu"],
-    ul[role="listbox"] {
+    div[data-rac="popover"],
+    ul[role="listbox"],
+    div[role="listbox"] {
         background: #080C16 !important;
         border: 1px solid rgba(0, 240, 255, 0.3) !important;
         border-radius: 12px !important;
@@ -599,7 +577,9 @@ st.markdown("""
         padding: 6px !important;
     }
 
-    li[role="option"] {
+    li[role="option"],
+    div[role="option"],
+    [data-rac="item"] {
         background: transparent !important;
         color: var(--hud-text-secondary) !important;
         font-family: var(--font-body) !important;
@@ -610,7 +590,11 @@ st.markdown("""
         transition: var(--transition-smooth) !important;
     }
     li[role="option"]:hover,
-    li[role="option"][aria-selected="true"] {
+    li[role="option"][aria-selected="true"],
+    div[role="option"]:hover,
+    div[role="option"][aria-selected="true"],
+    [data-rac="item"]:hover,
+    [data-rac="item"][data-selected="true"] {
         background: rgba(0, 240, 255, 0.12) !important;
         color: #00F0FF !important;
         font-weight: 600 !important;
@@ -792,7 +776,8 @@ st.markdown("""
     }
 
     /* Folium Map Radar Frame */
-    iframe {
+    div[data-testid="stCustomComponentV1"] iframe,
+    .element-container iframe {
         border-radius: var(--radius-card) !important;
         border: 1px solid rgba(0, 240, 255, 0.25) !important;
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 240, 255, 0.15) !important;
@@ -800,7 +785,8 @@ st.markdown("""
         display: block !important;
         transition: var(--transition-smooth);
     }
-    iframe:hover {
+    div[data-testid="stCustomComponentV1"] iframe:hover,
+    .element-container iframe:hover {
         border-color: rgba(0, 240, 255, 0.5) !important;
         box-shadow: 0 16px 50px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 240, 255, 0.25) !important;
     }
@@ -934,13 +920,6 @@ st.markdown("""
         }
     }
 
-    /* Native Holographic HUD Crosshair Cursor */
-    html, body, .stApp {
-        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2300F0FF" stroke-width="1.5"><circle cx="12" cy="12" r="3" fill="%2300F0FF"/><circle cx="12" cy="12" r="8" stroke-dasharray="2 3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>') 12 12, crosshair !important;
-    }
-    button, a, input, select, [role="button"], .stSelectbox, .stFileUploader, [data-testid="stFileUploaderDropzone"] {
-        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="%2300FFA3" stroke-width="2"><circle cx="13" cy="13" r="3.5" fill="%2300FFA3"/><circle cx="13" cy="13" r="9"/><line x1="13" y1="0" x2="13" y2="5"/><line x1="13" y1="21" x2="13" y2="26"/><line x1="0" y1="13" x2="5" y2="13"/><line x1="21" y1="13" x2="26" y2="13"/></svg>') 13 13, pointer !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1711,7 +1690,7 @@ with st.sidebar:
     st.caption("Includes direct integration with **Google Maps, Google Earth 3D, and Google Street View**.")
 
 # --- Main Page Header ---
-st.markdown("<h1 class='main-header'>🌍 Global & Hyper-Local GeoGuessr AI</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-header'><span class='header-globe'>🌍</span> Global & Hyper-Local GeoGuessr AI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='main-subtitle'>Pins street view and outdoor landscape photos down to <b>exact global countries, Indian states, and Kerala village micro-regions</b> using multi-scale vision AI and satellite telemetry.</p>", unsafe_allow_html=True)
 
 # Tactical Telemetry Marquee Strip
