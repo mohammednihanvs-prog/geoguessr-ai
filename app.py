@@ -17,7 +17,7 @@ import numpy as np
 import folium
 from folium.plugins import HeatMap
 from streamlit_folium import st_folium
-from PIL import Image, ExifTags
+from PIL import Image, ImageOps, ExifTags
 from transformers import CLIPModel, CLIPProcessor
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
@@ -931,7 +931,7 @@ geolocator = Nominatim(user_agent="geoguessr_ai_global_locator")
 
 # --- Residual Vision Adapter Architecture (Tip-Adapter / CLIP-Adapter) ---
 class ResidualAdapter(nn.Module):
-    def __init__(self, dim=768, bottleneck=256, alpha=0.5):
+    def __init__(self, dim=768, bottleneck=256, alpha=0.85):
         super().__init__()
         self.alpha = alpha
         self.net = nn.Sequential(
@@ -1016,8 +1016,9 @@ def load_database():
     adapter = None
     if os.path.exists(ADAPTER_FILE):
         try:
-            adapter = ResidualAdapter()
+            adapter = ResidualAdapter(alpha=0.85)
             adapter.load_state_dict(torch.load(ADAPTER_FILE, map_location="cpu", weights_only=True))
+            adapter.alpha = 0.85
             adapter.eval()
         except Exception:
             adapter = None
@@ -1121,6 +1122,13 @@ def extract_exif_gps(image):
     Extracts authentic GPS coordinates from image EXIF metadata locally.
     Returns (lat, lon) tuple in decimal degrees or None.
     """
+    cached = st.session_state.get("cached_exif_gps")
+    if cached is not None and isinstance(cached, tuple) and len(cached) == 2:
+        return cached
+
+    if not isinstance(image, Image.Image):
+        return None
+
     try:
         exif = image.getexif()
         if not exif:
@@ -1132,8 +1140,10 @@ def extract_exif_gps(image):
         def to_deg(dms):
             if isinstance(dms, (int, float)):
                 return float(dms)
-            d, m, s = dms
-            return float(d) + float(m) / 60.0 + float(s) / 3600.0
+            try:
+                return float(dms[0]) + float(dms[1]) / 60.0 + float(dms[2]) / 3600.0
+            except Exception:
+                return float(dms)
 
         lat = to_deg(gps_ifd[2])
         if gps_ifd.get(1) == 'S':
@@ -1201,76 +1211,6 @@ def find_reference_exemplar(location_name):
     if best_img:
         return os.path.join("Imgs", best_img)
     return None
-
-# --- Similar Scenes & Regional Lookalikes Finder ---
-def find_similar_exemplars(target_name, current_locations, img_dir="Imgs", max_results=4):
-    """
-    Finds reference photos and regional lookalikes for the predicted location.
-    Returns list of dicts: [{"path": ..., "caption": ..., "badge": ...}]
-    """
-    if not os.path.exists(img_dir):
-        return []
-
-    target_loc = next((l for l in current_locations if l["name"].strip().lower() == target_name.strip().lower()), None)
-    target_country = target_loc.get("country", "") if target_loc else ""
-    target_region = target_loc.get("region", "") if target_loc else ""
-    target_tokens = set(target_name.lower().replace(",", " ").replace("-", " ").split())
-
-    results = []
-    seen_files = set()
-
-    # Pass 1: Direct landmark matches
-    for fname in os.listdir(img_dir):
-        if not fname.lower().endswith((".jpg", ".jpeg", ".png")):
-            continue
-        clean_fn = fname.lower().replace(".jpg", "").replace(".jpeg", "").replace(".png", "").replace("_", " ").replace("-", " ")
-        fn_tokens = set(clean_fn.split())
-        overlap = len(target_tokens.intersection(fn_tokens))
-        if overlap >= 2:
-            seen_files.add(fname)
-            results.append({
-                "path": os.path.join(img_dir, fname),
-                "caption": fname.replace(".jpg", "").replace("_", " "),
-                "badge": "🎯 Exact Spot",
-                "score": overlap + 10
-            })
-
-    # Pass 2: Regional / State matches
-    if target_region:
-        reg_tokens = set(target_region.lower().replace(",", " ").split())
-        for fname in os.listdir(img_dir):
-            if fname in seen_files or not fname.lower().endswith((".jpg", ".jpeg", ".png")):
-                continue
-            clean_fn = fname.lower().replace(".jpg", "").replace(".jpeg", "").replace(".png", "").replace("_", " ").replace("-", " ")
-            fn_tokens = set(clean_fn.split())
-            if reg_tokens.intersection(fn_tokens):
-                seen_files.add(fname)
-                results.append({
-                    "path": os.path.join(img_dir, fname),
-                    "caption": fname.replace(".jpg", "").replace("_", " "),
-                    "badge": f"📍 Same Region ({target_region})",
-                    "score": 5
-                })
-
-    # Pass 3: Country matches
-    if target_country and len(results) < max_results:
-        country_tokens = set(target_country.lower().replace(",", " ").split())
-        for fname in os.listdir(img_dir):
-            if fname in seen_files or not fname.lower().endswith((".jpg", ".jpeg", ".png")):
-                continue
-            clean_fn = fname.lower().replace(".jpg", "").replace(".jpeg", "").replace(".png", "").replace("_", " ").replace("-", " ")
-            fn_tokens = set(clean_fn.split())
-            if country_tokens.intersection(fn_tokens):
-                seen_files.add(fname)
-                results.append({
-                    "path": os.path.join(img_dir, fname),
-                    "caption": fname.replace(".jpg", "").replace("_", " "),
-                    "badge": f"🚩 Same Country ({target_country})",
-                    "score": 2
-                })
-
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return results[:max_results]
 
 # --- Live Wikimedia Views Fetcher (Free & Open Educational Commons) ---
 def fetch_wikimedia_views(location_name, max_images=3):
@@ -1351,7 +1291,7 @@ def run_auto_train(epochs=30, lr=2e-3):
     Y = torch.tensor(targets_list, dtype=torch.long)
 
     # Train Residual Adapter
-    new_adapter = ResidualAdapter(dim=X.shape[1], bottleneck=256, alpha=0.5)
+    new_adapter = ResidualAdapter(dim=X.shape[1], bottleneck=256, alpha=0.85)
     optimizer = torch.optim.AdamW(new_adapter.parameters(), lr=lr, weight_decay=1e-4)
     loss_fn = nn.CrossEntropyLoss()
 
@@ -1448,42 +1388,42 @@ def predict_location(image, current_embeddings, current_locations, corrections_l
         # (a) Driving side consistency
         if "🚗 Traffic Flow Hint" in clue_map:
             side_label, side_conf = clue_map["🚗 Traffic Flow Hint"]
-            if side_conf >= 0.70:
+            if side_conf >= 0.45:
                 expected_side = "Left" if "left" in side_label.lower() else "Right"
                 for idx, loc in enumerate(active_locations):
                     loc_side = loc.get("driving_side", "")
                     if loc_side == expected_side:
-                        sim_scores[idx] += 0.20 * (side_conf - 0.5)
+                        sim_scores[idx] += 0.15 * (side_conf - 0.4)
                     elif loc_side and loc_side != "Unknown":
-                        sim_scores[idx] -= 0.15 * (side_conf - 0.5)
+                        sim_scores[idx] -= 0.10 * (side_conf - 0.4)
 
         # (b) Vegetation & Climate Profile Consistency
         if "🌿 Vegetation & Flora" in clue_map:
             veg_label, veg_conf = clue_map["🌿 Vegetation & Flora"]
-            if veg_conf >= 0.72:
+            if veg_conf >= 0.45:
                 veg_lower = veg_label.lower()
                 for idx, loc in enumerate(active_locations):
                     p_lower = loc.get("prompt", "").lower()
                     if "tropical" in veg_lower and ("tropical" in p_lower or "palm" in p_lower or "rainforest" in p_lower or "monsoon" in p_lower):
-                        sim_scores[idx] += 0.25 * (veg_conf - 0.5)
+                        sim_scores[idx] += 0.20 * (veg_conf - 0.4)
                     elif "arid" in veg_lower and ("desert" in p_lower or "arid" in p_lower or "sand" in p_lower or "scrub" in p_lower):
-                        sim_scores[idx] += 0.25 * (veg_conf - 0.5)
+                        sim_scores[idx] += 0.20 * (veg_conf - 0.4)
                     elif "alpine" in veg_lower and ("alpine" in p_lower or "mountain" in p_lower or "snow" in p_lower or "pine" in p_lower):
-                        sim_scores[idx] += 0.25 * (veg_conf - 0.5)
+                        sim_scores[idx] += 0.20 * (veg_conf - 0.4)
 
         # (c) Road Surface Markings Hint
         if "🛣️ Road & Surface" in clue_map:
             road_label, road_conf = clue_map["🛣️ Road & Surface"]
-            if road_conf >= 0.75:
+            if road_conf >= 0.45:
                 road_lower = road_label.lower()
                 for idx, loc in enumerate(active_locations):
                     p_lower = loc.get("prompt", "").lower()
                     if "yellow" in road_lower and "yellow" in p_lower:
-                        sim_scores[idx] += 0.18 * (road_conf - 0.5)
+                        sim_scores[idx] += 0.15 * (road_conf - 0.4)
                     elif "unpaved" in road_lower and ("dirt" in p_lower or "unpaved" in p_lower or "gravel" in p_lower):
-                        sim_scores[idx] += 0.20 * (road_conf - 0.5)
+                        sim_scores[idx] += 0.15 * (road_conf - 0.4)
                     elif "cobblestone" in road_lower and ("cobblestone" in p_lower or "stone paved" in p_lower):
-                        sim_scores[idx] += 0.20 * (road_conf - 0.5)
+                        sim_scores[idx] += 0.15 * (road_conf - 0.4)
     except Exception:
         pass
 
@@ -1736,7 +1676,7 @@ col_left, col_right = st.columns([1, 1], gap="medium")
 
 with col_left:
     st.subheader("1. Select or Upload Image")
-    uploaded_file = st.file_uploader("Upload an outdoor or street photo...", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("Upload an outdoor or street photo...", type=["jpg", "jpeg", "png", "webp", "jfif"])
 
     # Categorized Sample Picker for instant testing
     sample_categories = {
@@ -1812,16 +1752,31 @@ with col_left:
     if uploaded_file is not None:
         try:
             uploaded_file.seek(0)
-            image = Image.open(uploaded_file).convert("RGB")
+            raw_im = Image.open(uploaded_file)
+            # 1. Extract genuine camera GPS EXIF before any destructive conversions
+            cached_gps = extract_exif_gps(raw_im)
+            st.session_state["cached_exif_gps"] = cached_gps
+            # 2. Transpose according to camera EXIF orientation tag (prevents 90/180/270 deg rotation on phone photos)
+            oriented_im = ImageOps.exif_transpose(raw_im)
+            # 3. Scale down ultra-high-resolution smartphone captures (12MP-48MP) to prevent OOM/CPU choke while preserving crisp micro-details
+            if max(oriented_im.size) > 1600:
+                oriented_im.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            image = oriented_im.convert("RGB")
             img_source_key = f"upload_{uploaded_file.name}_{uploaded_file.size}"
-        except Exception:
-            st.error("Could not read uploaded image. Please ensure it is a valid JPG or PNG file.")
+        except Exception as e:
+            st.error(f"Could not read uploaded image: {e}. Please ensure it is a valid JPG, PNG, WEBP, or JFIF file.")
             image = None
     elif selected_sample != "(Upload your own image)":
         clean_filename = selected_sample.split(" ", 1)[1]
         sample_path = os.path.join("Imgs", clean_filename)
         if os.path.exists(sample_path):
-            image = Image.open(sample_path).convert("RGB")
+            raw_im = Image.open(sample_path)
+            cached_gps = extract_exif_gps(raw_im)
+            st.session_state["cached_exif_gps"] = cached_gps
+            oriented_im = ImageOps.exif_transpose(raw_im)
+            if max(oriented_im.size) > 1600:
+                oriented_im.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            image = oriented_im.convert("RGB")
             img_source_key = f"sample_{clean_filename}"
 
     # Reset stale prediction if active image changed or was removed
@@ -1835,6 +1790,8 @@ with col_left:
             del st.session_state["image_embedding"]
         if "heat_cache" in st.session_state:
             del st.session_state["heat_cache"]
+        if image is None and "cached_exif_gps" in st.session_state:
+            del st.session_state["cached_exif_gps"]
 
     if image is not None:
         if "ranked" in st.session_state and len(st.session_state["ranked"]) > 0:
@@ -2091,21 +2048,6 @@ with col_right:
             with c_ref:
                 ref_im = Image.open(ref_image_path).convert("RGB")
                 st.image(ref_im, caption=f"Ground-Truth Reference: {os.path.basename(ref_image_path).replace('_', ' ').replace('.jpg', '')}", use_container_width=True)
-
-        # Similar Scenes & Regional Lookalikes Gallery
-        similar_items = find_similar_exemplars(top_pick["name"], locations, img_dir="Imgs", max_results=4)
-        if similar_items:
-            st.markdown("#### 🏞️ Similar Scenes & Visual Lookalikes")
-            st.caption("Visually similar scenes and regional exemplars from the location database:")
-            sim_cols = st.columns(min(4, len(similar_items)))
-            for s_i, s_item in enumerate(similar_items):
-                with sim_cols[s_i % len(sim_cols)]:
-                    try:
-                        s_im = Image.open(s_item["path"]).convert("RGB")
-                        st.image(s_im, caption=s_item["caption"][:26], use_container_width=True)
-                        st.markdown(f"<span class='clue-badge' style='font-size:0.72rem; padding:3px 8px; margin:0;'>{s_item['badge']}</span>", unsafe_allow_html=True)
-                    except Exception:
-                        pass
 
         # Live Public Street Views from Wikimedia Commons
         with st.expander(f"🌐 Fetch Live Public Street Views for '{top_pick['name'].split(',')[0]}'", expanded=False):
