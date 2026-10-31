@@ -113,7 +113,7 @@ st.markdown("""
     }
 
     /* Clean Streamlit Default Chrome without breaking the Sidebar toggle */
-    #MainMenu, footer, .stDeployButton, div[data-testid="stDecoration"], [data-testid="stToolbar"] {
+    #MainMenu, footer, .stDeployButton, div[data-testid="stDecoration"], [data-testid="stToolbarActions"] {
         display: none !important;
         visibility: hidden !important;
         height: 0 !important;
@@ -125,38 +125,52 @@ st.markdown("""
 
     header[data-testid="stHeader"] {
         background: transparent !important;
-        color: var(--hud-cyan) !important;
         pointer-events: auto !important;
         z-index: 99990 !important;
+        height: 3rem !important;
     }
 
-    /* Style the Sidebar Expand/Collapse Toggle Controls */
+    [data-testid="stToolbar"] {
+        background: transparent !important;
+        visibility: visible !important;
+        display: flex !important;
+        pointer-events: auto !important;
+        z-index: 99995 !important;
+    }
+
+    /* Style the Sidebar Expand/Collapse Toggle Controls across all Streamlit versions */
+    [data-testid="stExpandSidebarButton"],
     [data-testid="stSidebarCollapsedControl"] {
         display: flex !important;
         visibility: visible !important;
         opacity: 1 !important;
-        background: rgba(8, 14, 28, 0.92) !important;
-        border: 1px solid rgba(0, 240, 255, 0.35) !important;
+        background: rgba(8, 14, 28, 0.95) !important;
+        border: 1px solid rgba(0, 240, 255, 0.5) !important;
         border-radius: 8px !important;
-        box-shadow: 0 0 16px rgba(0, 240, 255, 0.25) !important;
+        box-shadow: 0 0 16px rgba(0, 240, 255, 0.35) !important;
         top: 0.75rem !important;
         left: 0.75rem !important;
-        z-index: 99999 !important;
+        z-index: 999999 !important;
         pointer-events: auto !important;
+        cursor: pointer !important;
         transition: all 0.2s ease !important;
     }
 
+    [data-testid="stExpandSidebarButton"]:hover,
     [data-testid="stSidebarCollapsedControl"]:hover {
         border-color: #00F0FF !important;
-        box-shadow: 0 0 24px rgba(0, 240, 255, 0.5) !important;
-        transform: scale(1.05);
+        box-shadow: 0 0 24px rgba(0, 240, 255, 0.6) !important;
+        transform: scale(1.08);
     }
 
+    [data-testid="stExpandSidebarButton"] button,
     [data-testid="stSidebarCollapsedControl"] button,
     [data-testid="stSidebarCollapseButton"] button {
         color: #00F0FF !important;
+        pointer-events: auto !important;
     }
 
+    [data-testid="stExpandSidebarButton"] svg,
     [data-testid="stSidebarCollapsedControl"] svg,
     [data-testid="stSidebarCollapseButton"] svg {
         fill: #00F0FF !important;
@@ -317,11 +331,12 @@ st.markdown("""
 
     /* Sidebar Command Console */
     [data-testid="stSidebar"] {
-        background: rgba(5, 8, 16, 0.90) !important;
+        background: rgba(5, 8, 16, 0.95) !important;
         backdrop-filter: blur(28px) saturate(180%) !important;
         -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
-        border-right: 1px solid rgba(0, 240, 255, 0.14) !important;
-        box-shadow: 4px 0 30px rgba(0, 0, 0, 0.5) !important;
+        border-right: 1px solid rgba(0, 240, 255, 0.22) !important;
+        box-shadow: 4px 0 35px rgba(0, 0, 0, 0.7) !important;
+        z-index: 99998 !important;
     }
 
     [data-testid="stSidebar"] h1, 
