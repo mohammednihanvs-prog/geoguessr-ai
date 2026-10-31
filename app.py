@@ -112,8 +112,8 @@ st.markdown("""
         min-height: 100vh;
     }
 
-    /* Hide Streamlit Clutter Chrome */
-    #MainMenu, header, footer, .stDeployButton, div[data-testid="stDecoration"] {
+    /* Clean Streamlit Default Chrome without breaking the Sidebar toggle */
+    #MainMenu, footer, .stDeployButton, div[data-testid="stDecoration"], [data-testid="stToolbar"] {
         display: none !important;
         visibility: hidden !important;
         height: 0 !important;
@@ -121,6 +121,46 @@ st.markdown("""
         padding: 0 !important;
         margin: 0 !important;
         pointer-events: none !important;
+    }
+
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        color: var(--hud-cyan) !important;
+        pointer-events: auto !important;
+        z-index: 99990 !important;
+    }
+
+    /* Style the Sidebar Expand/Collapse Toggle Controls */
+    [data-testid="stSidebarCollapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        background: rgba(8, 14, 28, 0.92) !important;
+        border: 1px solid rgba(0, 240, 255, 0.35) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 0 16px rgba(0, 240, 255, 0.25) !important;
+        top: 0.75rem !important;
+        left: 0.75rem !important;
+        z-index: 99999 !important;
+        pointer-events: auto !important;
+        transition: all 0.2s ease !important;
+    }
+
+    [data-testid="stSidebarCollapsedControl"]:hover {
+        border-color: #00F0FF !important;
+        box-shadow: 0 0 24px rgba(0, 240, 255, 0.5) !important;
+        transform: scale(1.05);
+    }
+
+    [data-testid="stSidebarCollapsedControl"] button,
+    [data-testid="stSidebarCollapseButton"] button {
+        color: #00F0FF !important;
+    }
+
+    [data-testid="stSidebarCollapsedControl"] svg,
+    [data-testid="stSidebarCollapseButton"] svg {
+        fill: #00F0FF !important;
+        stroke: #00F0FF !important;
     }
 
     /* Tactical Container Spacing */
