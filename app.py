@@ -1678,8 +1678,44 @@ with st.sidebar:
         st.markdown("### 🧠 Admin Training & Ingestion Console <span class='clue-badge' style='background:rgba(0,255,163,0.15); color:#00FFA3; font-size:0.68rem; padding:2px 7px;'>ADMIN</span>", unsafe_allow_html=True)
         st.caption(f"Admin Session Active • Indexed Places: `{len(locations)}` • Memory Slots: `{len(corrections)}`")
 
-        # Option 1: Trigger Model Training
-        if st.button("🚀 Trigger Auto-Train", use_container_width=True):
+        # Option 1: Trigger Model Training & Expand Knowledge Base
+        st.markdown("#### ⚡ Train & Expand Knowledge Base")
+        st.caption("Each run automatically selects 20 new locations (10 Kerala, 5 India, 5 Global), generates StreetCLIP embeddings, and retrains the Residual Vision Adapter.")
+
+        if "just_added_locations" in st.session_state:
+            locs_added = st.session_state.pop("just_added_locations")
+            acc_init, acc_final, elapsed = st.session_state.pop("just_train_stats", (0.0, 0.0, 0.0))
+            k_n = sum(1 for x in locs_added if x.get("category") == "Kerala - Micro-Region" or "kerala" in x.get("name", "").lower())
+            i_n = sum(1 for x in locs_added if ("India" in x.get("category", "") or "india" in x.get("country", "").lower()) and x not in locs_added[:k_n])
+            g_n = len(locs_added) - k_n - i_n
+            st.success(
+                f"🎉 **Auto-Train Complete! Added 20 New Locations**\n\n"
+                f"🌴 **Kerala:** +{k_n}  |  🇮🇳 **India:** +{i_n}  |  🌍 **Global:** +{g_n}\n\n"
+                f"🎯 **Adapter Accuracy:** **{acc_final:.1f}%** (was {acc_init:.1f}%)\n\n"
+                f"⏱️ **Training Time:** {elapsed:.1f}s • Total Places: `{len(locations)}`"
+            )
+            with st.expander("📋 View Newly Added 20 Places", expanded=False):
+                for idx, loc in enumerate(locs_added, 1):
+                    badge = "🌴 Kerala" if "kerala" in loc["name"].lower() else ("🇮🇳 India" if "india" in loc.get("country", "").lower() else "🌍 Global")
+                    st.markdown(f"**{idx}.** `{badge}` **{loc['name']}**")
+
+        if st.button("🚀 Train & Add 20 Locations (10 Kerala, 5 India, 5 Global)", use_container_width=True):
+            with st.spinner("Ingesting 20 new locations (10 Kerala, 5 India, 5 Global) & retraining Residual Adapter..."):
+                import location_expander
+                processor, model, _ = get_vision_models()
+                added_locs, acc_init, acc_final, elapsed = location_expander.expand_database_and_train_20(
+                    processor=processor,
+                    model=model,
+                    cache_file=CACHE_FILE,
+                    adapter_file=ADAPTER_FILE,
+                    epochs=35
+                )
+                load_database.clear()
+                st.session_state["just_added_locations"] = added_locs
+                st.session_state["just_train_stats"] = (acc_init, acc_final, elapsed)
+                st.rerun()
+
+        if st.button("🔄 Retrain Adapter Only (Without Adding Places)", use_container_width=True):
             with st.spinner("Running automated Residual Vision Adapter training across dataset..."):
                 acc_init, acc_final, elapsed = run_auto_train(epochs=35)
                 st.success(f"🎉 **Auto-Train Complete!**\n\nAccuracy: **{acc_final:.1f}%** (was {acc_init:.1f}%)\n\nTime: {elapsed:.1f}s")
