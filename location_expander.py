@@ -664,35 +664,74 @@ def expand_database_and_train_20(processor, model, cache_file, adapter_file, epo
         except Exception:
             continue
 
+    import scoring_engine
+
     if feats_list:
         X = torch.stack(feats_list)
         Y = torch.tensor(targets_list, dtype=torch.long)
+
+        loc_lats = torch.tensor([float(l.get("lat", 0.0)) for l in updated_locs], dtype=torch.float32)
+        loc_lons = torch.tensor([float(l.get("lon", 0.0)) for l in updated_locs], dtype=torch.float32)
 
         new_adapter = ResidualAdapter(dim=X.shape[1], bottleneck=256, alpha=0.85)
         optimizer = torch.optim.AdamW(new_adapter.parameters(), lr=2e-3, weight_decay=1e-4)
         loss_fn = nn.CrossEntropyLoss()
 
+        # Initial evaluation with distance error
         new_adapter.eval()
         with torch.no_grad():
             out_init = new_adapter(X)
-            acc_init = (torch.argmax((out_init @ updated_embs.T) * 35.0, dim=-1) == Y).float().mean().item() * 100.0
+            init_logits = (out_init @ updated_embs.T) * 35.0
+            init_preds = torch.argmax(init_logits, dim=-1)
+            acc_init = (init_preds == Y).float().mean().item() * 100.0
+            _, mean_err_init, med_err_init, bullseye_init, pinpoint_init = scoring_engine.compute_batch_distance_errors(
+                init_preds, Y, loc_lats, loc_lons
+            )
 
+        # Distance penalty matrix for targets against all locations
+        with torch.no_grad():
+            dist_penalty = scoring_engine.compute_distance_penalty_matrix(Y, loc_lats, loc_lons)
+
+        # Distance-regularized training
         new_adapter.train()
         for _ in range(epochs):
             optimizer.zero_grad()
             out_feats = new_adapter(X)
-            loss = loss_fn((out_feats @ updated_embs.T) * 35.0, Y)
+            logits = (out_feats @ updated_embs.T) * 35.0
+            loss_ce = loss_fn(logits, Y)
+            probs = torch.softmax(logits, dim=-1)
+            loss_dist = (probs * dist_penalty).sum(dim=-1).mean()
+            loss = loss_ce + 0.35 * loss_dist
             loss.backward()
             optimizer.step()
 
+        # Final evaluation with distance error
         new_adapter.eval()
         with torch.no_grad():
             out_final = new_adapter(X)
-            acc_final = (torch.argmax((out_final @ updated_embs.T) * 35.0, dim=-1) == Y).float().mean().item() * 100.0
+            final_logits = (out_final @ updated_embs.T) * 35.0
+            final_preds = torch.argmax(final_logits, dim=-1)
+            acc_final = (final_preds == Y).float().mean().item() * 100.0
+            _, mean_err_final, med_err_final, bullseye_final, pinpoint_final = scoring_engine.compute_batch_distance_errors(
+                final_preds, Y, loc_lats, loc_lons
+            )
 
         torch.save(new_adapter.state_dict(), adapter_file)
-    else:
-        acc_init, acc_final = 0.0, 0.0
+        elapsed = time.time() - t0
+        err_reduction = ((mean_err_init - mean_err_final) / max(1.0, mean_err_init)) * 100.0
 
-    elapsed = time.time() - t0
-    return new_20, acc_init, acc_final, elapsed
+        metrics = scoring_engine.TrainingMetrics({
+            "acc_init": acc_init,
+            "acc_final": acc_final,
+            "mean_err_init": mean_err_init,
+            "mean_err_final": mean_err_final,
+            "med_err_final": med_err_final,
+            "err_reduction_pct": err_reduction,
+            "bullseye_final": bullseye_final,
+            "pinpoint_final": pinpoint_final,
+            "elapsed": elapsed
+        })
+    else:
+        metrics = scoring_engine.TrainingMetrics({"acc_init": 0.0, "acc_final": 0.0, "elapsed": 0.0})
+
+    return new_20, metrics

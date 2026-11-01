@@ -1300,13 +1300,14 @@ def fetch_wikimedia_views(location_name, max_images=3):
     except Exception:
         return []
 
-# --- Automated Self-Training Engine for Residual Adapter ---
+# --- Automated Self-Training Engine for Residual Adapter (Distance & Error Optimized) ---
 def run_auto_train(epochs=30, lr=2e-3):
     """
     Automated self-training engine for the Residual Vision Adapter.
-    Trains across all local images in Imgs/ against indexed embeddings and updates clip_adapter.pt in-place.
-    Returns (acc_init, acc_final, elapsed_sec).
+    Optimizes both classification accuracy and physical geographic distance error (km).
+    Returns TrainingMetrics with distance reduction, median error, and accuracy.
     """
+    import scoring_engine
     processor, model, _ = get_vision_models()
     import time
     t0 = time.time()
@@ -1343,37 +1344,74 @@ def run_auto_train(epochs=30, lr=2e-3):
             continue
 
     if not feats_list:
-        return 0.0, 0.0, 0.0
+        return scoring_engine.TrainingMetrics({"acc_init": 0.0, "acc_final": 0.0, "elapsed": 0.0})
 
     X = torch.stack(feats_list)
     Y = torch.tensor(targets_list, dtype=torch.long)
+
+    loc_lats = torch.tensor([float(l.get("lat", 0.0)) for l in locations], dtype=torch.float32)
+    loc_lons = torch.tensor([float(l.get("lon", 0.0)) for l in locations], dtype=torch.float32)
 
     # Train Residual Adapter
     new_adapter = ResidualAdapter(dim=X.shape[1], bottleneck=256, alpha=0.85)
     optimizer = torch.optim.AdamW(new_adapter.parameters(), lr=lr, weight_decay=1e-4)
     loss_fn = nn.CrossEntropyLoss()
 
+    # Initial evaluation with physical distance error
     new_adapter.eval()
     with torch.no_grad():
         out_init = new_adapter(X)
-        acc_init = (torch.argmax((out_init @ text_embeddings.T) * 35.0, dim=-1) == Y).float().mean().item() * 100.0
+        init_logits = (out_init @ text_embeddings.T) * 35.0
+        init_preds = torch.argmax(init_logits, dim=-1)
+        acc_init = (init_preds == Y).float().mean().item() * 100.0
+        _, mean_err_init, med_err_init, bullseye_init, pinpoint_init = scoring_engine.compute_batch_distance_errors(
+            init_preds, Y, loc_lats, loc_lons
+        )
 
+    # Compute distance penalty matrix for target places
+    with torch.no_grad():
+        dist_penalty = scoring_engine.compute_distance_penalty_matrix(Y, loc_lats, loc_lons)
+
+    # Training loop: Simultaneous Cross-Entropy + Geographic Distance Error Loss
     new_adapter.train()
     for _ in range(epochs):
         optimizer.zero_grad()
         out_feats = new_adapter(X)
-        loss = loss_fn((out_feats @ text_embeddings.T) * 35.0, Y)
+        logits = (out_feats @ text_embeddings.T) * 35.0
+        loss_ce = loss_fn(logits, Y)
+        probs = torch.softmax(logits, dim=-1)
+        loss_dist = (probs * dist_penalty).sum(dim=-1).mean()
+        loss = loss_ce + 0.35 * loss_dist
         loss.backward()
         optimizer.step()
 
+    # Final evaluation with physical distance error
     new_adapter.eval()
     with torch.no_grad():
         out_final = new_adapter(X)
-        acc_final = (torch.argmax((out_final @ text_embeddings.T) * 35.0, dim=-1) == Y).float().mean().item() * 100.0
+        final_logits = (out_final @ text_embeddings.T) * 35.0
+        final_preds = torch.argmax(final_logits, dim=-1)
+        acc_final = (final_preds == Y).float().mean().item() * 100.0
+        _, mean_err_final, med_err_final, bullseye_final, pinpoint_final = scoring_engine.compute_batch_distance_errors(
+            final_preds, Y, loc_lats, loc_lons
+        )
 
     torch.save(new_adapter.state_dict(), ADAPTER_FILE)
     elapsed = time.time() - t0
-    return acc_init, acc_final, elapsed
+    err_reduction_pct = ((mean_err_init - mean_err_final) / max(1.0, mean_err_init)) * 100.0
+
+    metrics = scoring_engine.TrainingMetrics({
+        "acc_init": acc_init,
+        "acc_final": acc_final,
+        "mean_err_init": mean_err_init,
+        "mean_err_final": mean_err_final,
+        "med_err_final": med_err_final,
+        "err_reduction_pct": err_reduction_pct,
+        "bullseye_final": bullseye_final,
+        "pinpoint_final": pinpoint_final,
+        "elapsed": elapsed
+    })
+    return metrics
 
 # --- Multi-Scale Test-Time Augmentation (TTA) with Micro-Clue Fusion ---
 def extract_visual_representation(image):
@@ -1682,22 +1720,43 @@ with st.sidebar:
         st.markdown("#### ⚡ Train & Expand Knowledge Base")
         st.caption("Each run automatically selects 20 new locations (10 Kerala, 5 India, 5 Global), generates StreetCLIP embeddings, and retrains the Residual Vision Adapter.")
 
-        if "just_added_locations" in st.session_state:
-            locs_added = st.session_state.pop("just_added_locations")
-            acc_init, acc_final, elapsed = st.session_state.pop("just_train_stats", (0.0, 0.0, 0.0))
-            k_n = sum(1 for x in locs_added if x.get("category") == "Kerala - Micro-Region" or "kerala" in x.get("name", "").lower())
-            i_n = sum(1 for x in locs_added if ("India" in x.get("category", "") or "india" in x.get("country", "").lower()) and x not in locs_added[:k_n])
-            g_n = len(locs_added) - k_n - i_n
+        if "just_train_stats" in st.session_state:
+            stats = st.session_state.pop("just_train_stats")
+            locs_added = st.session_state.pop("just_added_locations", [])
+
+            if isinstance(stats, dict):
+                a_init = stats.get("acc_init", 0.0)
+                a_final = stats.get("acc_final", 0.0)
+                m_init = stats.get("mean_err_init", 0.0)
+                m_final = stats.get("mean_err_final", 0.0)
+                e_red = stats.get("err_reduction_pct", 0.0)
+                b_eye = stats.get("bullseye_final", 0.0)
+                p_point = stats.get("pinpoint_final", 0.0)
+                el = stats.get("elapsed", 0.0)
+            else:
+                a_init, a_final, el = stats
+                m_init, m_final, e_red, b_eye, p_point = 0.0, 0.0, 0.0, 0.0, 0.0
+
+            loc_header = ""
+            if locs_added:
+                k_n = sum(1 for x in locs_added if x.get("category") == "Kerala - Micro-Region" or "kerala" in x.get("name", "").lower())
+                i_n = sum(1 for x in locs_added if ("India" in x.get("category", "") or "india" in x.get("country", "").lower()) and x not in locs_added[:k_n])
+                g_n = len(locs_added) - k_n - i_n
+                loc_header = f"**+20 New Locations Added** (🌴 {k_n} Kerala | 🇮🇳 {i_n} India | 🌍 {g_n} Global)\n\n"
+
             st.success(
-                f"🎉 **Auto-Train Complete! Added 20 New Locations**\n\n"
-                f"🌴 **Kerala:** +{k_n}  |  🇮🇳 **India:** +{i_n}  |  🌍 **Global:** +{g_n}\n\n"
-                f"🎯 **Adapter Accuracy:** **{acc_final:.1f}%** (was {acc_init:.1f}%)\n\n"
-                f"⏱️ **Training Time:** {elapsed:.1f}s • Total Places: `{len(locations)}`"
+                f"🎉 **Auto-Train Complete! Optimized on Distance & Error**\n\n"
+                f"{loc_header}"
+                f"🎯 **Model Accuracy:** **{a_final:.1f}%** (was {a_init:.1f}%)\n\n"
+                f"📏 **Mean Distance Error:** **{m_final:.1f} km** (was {m_init:.1f} km, **{e_red:+.1f}% error reduction**)\n\n"
+                f"🎯 **Bullseye Precision (<5 km):** **{b_eye:.1f}%** | **Pinpoint (<25 km):** **{p_point:.1f}%**\n\n"
+                f"⏱️ **Training Time:** {el:.1f}s • Total Places: `{len(locations)}`"
             )
-            with st.expander("📋 View Newly Added 20 Places", expanded=False):
-                for idx, loc in enumerate(locs_added, 1):
-                    badge = "🌴 Kerala" if "kerala" in loc["name"].lower() else ("🇮🇳 India" if "india" in loc.get("country", "").lower() else "🌍 Global")
-                    st.markdown(f"**{idx}.** `{badge}` **{loc['name']}**")
+            if locs_added:
+                with st.expander("📋 View Newly Added 20 Places", expanded=False):
+                    for idx, loc in enumerate(locs_added, 1):
+                        badge = "🌴 Kerala" if "kerala" in loc["name"].lower() else ("🇮🇳 India" if "india" in loc.get("country", "").lower() else "🌍 Global")
+                        st.markdown(f"**{idx}.** `{badge}` **{loc['name']}**")
 
         if st.button("🚀 Train & Add 20 Locations (10 Kerala, 5 India, 5 Global)", use_container_width=True):
             with st.spinner("Ingesting 20 new locations (10 Kerala, 5 India, 5 Global) & retraining Residual Adapter..."):
@@ -1717,9 +1776,9 @@ with st.sidebar:
 
         if st.button("🔄 Retrain Adapter Only (Without Adding Places)", use_container_width=True):
             with st.spinner("Running automated Residual Vision Adapter training across dataset..."):
-                acc_init, acc_final, elapsed = run_auto_train(epochs=35)
-                st.success(f"🎉 **Auto-Train Complete!**\n\nAccuracy: **{acc_final:.1f}%** (was {acc_init:.1f}%)\n\nTime: {elapsed:.1f}s")
+                train_stats = run_auto_train(epochs=35)
                 load_database.clear()
+                st.session_state["just_train_stats"] = train_stats
                 st.rerun()
 
         # Option 2: Add New Location to Index & Train
@@ -1906,17 +1965,9 @@ def calculate_haversine(lat1, lon1, lat2, lon2):
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
     return R * c
 
-def compute_geoguessr_score(dist_km):
-    """
-    Precision 5-point scale per image:
-    - Guesses under 5 km receive the maximum 5.0 / 5.0 score (Bullseye!).
-    - Points smoothly scale down with distance error (minimum 0.0, maximum 5.0).
-    """
-    if dist_km <= 5.0:
-        return 5.0
-    # Smooth exponential decay based on distance error
-    score = 5.0 * math.exp(-(dist_km - 5.0) / 1200.0)
-    return max(0.0, min(5.0, round(score, 1)))
+import scoring_engine
+compute_geoguessr_score = scoring_engine.compute_geoguessr_score
+compute_geoguessr_score_details = scoring_engine.compute_geoguessr_score_details
 
 def render_geoguessr_game():
     # Session state initialization
@@ -2140,8 +2191,8 @@ def render_geoguessr_game():
                         user_dist = calculate_haversine(guessed_lat, guessed_lon, gt_lat, gt_lon)
                         ai_dist = calculate_haversine(float(ai_top["lat"]), float(ai_top["lon"]), gt_lat, gt_lon)
 
-                        user_score = compute_geoguessr_score(user_dist)
-                        ai_score = compute_geoguessr_score(ai_dist)
+                        user_score, user_rating, user_color, user_acc = compute_geoguessr_score_details(user_dist)
+                        ai_score, ai_rating, ai_color, ai_acc = compute_geoguessr_score_details(ai_dist)
 
                         st.session_state["game_rounds"] += 1
                         st.session_state["game_user_score"] += user_score
@@ -2187,12 +2238,16 @@ def render_geoguessr_game():
                             "user_lon": guessed_lon,
                             "user_dist": user_dist,
                             "user_score": user_score,
+                            "user_rating": user_rating,
+                            "user_acc": user_acc,
                             "ai_name": ai_top["name"],
                             "ai_lat": float(ai_top["lat"]),
                             "ai_lon": float(ai_top["lon"]),
                             "ai_conf": float(ai_top["confidence"]),
                             "ai_dist": ai_dist,
-                            "ai_score": ai_score
+                            "ai_score": ai_score,
+                            "ai_rating": ai_rating,
+                            "ai_acc": ai_acc
                         }
                         st.rerun()
             else:
@@ -2212,22 +2267,26 @@ def render_geoguessr_game():
                 col_r_user, col_r_ai = st.columns(2)
                 with col_r_user:
                     player_disp = current_player if current_player else "You"
+                    u_rate = res.get('user_rating', 'Bullseye')
+                    u_acc = res.get('user_acc', 100.0)
                     st.markdown(f"""
                     <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px;">
                         <h4 style="margin: 0; color: #60a5fa;">👤 {player_disp}</h4>
                         <p style="margin: 4px 0 0 0; font-size: 0.88rem;">Guess: <b>{res['user_label']}</b></p>
-                        <p style="margin: 4px 0 0 0; font-size: 0.95rem;">Distance Error: <b>{res['user_dist']:.1f} km</b></p>
-                        <p style="margin: 4px 0 0 0; font-size: 1.15rem; color: #93c5fd;"><b>+{res['user_score']:.1f} / 5.0 pts</b></p>
+                        <p style="margin: 4px 0 0 0; font-size: 0.95rem;">Distance Error: <b>{res['user_dist']:.1f} km</b> ({u_acc:.1f}% accuracy)</p>
+                        <p style="margin: 4px 0 0 0; font-size: 1.15rem; color: #93c5fd;"><b>+{res['user_score']:.2f} / 5.0 pts</b> <span style="font-size:0.80rem; padding: 2px 7px; border-radius: 4px; background: rgba(0,255,163,0.15); color: #00FFA3;">{u_rate}</span></p>
                     </div>
                     """, unsafe_allow_html=True)
 
                 with col_r_ai:
+                    ai_rate = res.get('ai_rating', 'Bullseye')
+                    ai_acc = res.get('ai_acc', 100.0)
                     st.markdown(f"""
                     <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px;">
                         <h4 style="margin: 0; color: #f87171;">🤖 StreetCLIP AI</h4>
                         <p style="margin: 4px 0 0 0; font-size: 0.88rem;">Guess: <b>{res['ai_name']}</b></p>
-                        <p style="margin: 4px 0 0 0; font-size: 0.95rem;">Distance Error: <b>{res['ai_dist']:.1f} km</b> ({res['ai_conf']*100:.1f}%)</p>
-                        <p style="margin: 4px 0 0 0; font-size: 1.15rem; color: #fca5a5;"><b>+{res['ai_score']:.1f} / 5.0 pts</b></p>
+                        <p style="margin: 4px 0 0 0; font-size: 0.95rem;">Distance Error: <b>{res['ai_dist']:.1f} km</b> ({ai_acc:.1f}% accuracy)</p>
+                        <p style="margin: 4px 0 0 0; font-size: 1.15rem; color: #fca5a5;"><b>+{res['ai_score']:.2f} / 5.0 pts</b> <span style="font-size:0.80rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,100,100,0.15); color: #ff8888;">{ai_rate}</span></p>
                     </div>
                     """, unsafe_allow_html=True)
 
