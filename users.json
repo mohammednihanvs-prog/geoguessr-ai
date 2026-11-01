@@ -16,5 +16,14 @@
     "losses": 1,
     "best_round_score": 4.8,
     "best_distance_km": 64.5
+  },
+  "straightfamily": {
+    "password_hash": "660373c96dd5aca97b05d7ed779141686a7257eac3648060bfd479b117d593a5",
+    "total_score": 15.0,
+    "rounds_played": 3,
+    "wins": 3,
+    "losses": 0,
+    "best_round_score": 5.0,
+    "best_distance_km": 3.1
   }
 }

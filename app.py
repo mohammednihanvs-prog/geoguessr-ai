@@ -1768,22 +1768,32 @@ def save_users(users):
     except Exception as e:
         print("Error saving users:", e)
 
+def find_user_key(users, username):
+    u_clean = username.strip()
+    if u_clean in users:
+        return u_clean
+    for k in users:
+        if k.lower() == u_clean.lower():
+            return k
+    return None
+
 def register_user(username, password):
     u = username.strip()
     if not u or len(u) < 3:
         return False, "Username must be at least 3 characters."
-    if len(password) < 4:
-        return False, "Password must be at least 4 characters."
+    if len(password) < 3:
+        return False, "Password must be at least 3 characters."
     users = load_users()
-    if u in users:
-        return False, "Username already exists. Please choose another username or sign in."
+    matched = find_user_key(users, u)
+    if matched:
+        return False, f"Username '{matched}' already exists. Click 'Sign In' or choose another name."
     users[u] = {
         "password_hash": hash_pw(password),
-        "total_score": 0,
+        "total_score": 0.0,
         "rounds_played": 0,
         "wins": 0,
         "losses": 0,
-        "best_round_score": 0,
+        "best_round_score": 0.0,
         "best_distance_km": None
     }
     save_users(users)
@@ -1791,12 +1801,15 @@ def register_user(username, password):
 
 def authenticate_user(username, password):
     u = username.strip()
+    if not u:
+        return False, "Please enter your username.", None
     users = load_users()
-    if u not in users:
-        return False, "Username not found. Please create a new player profile."
-    if users[u].get("password_hash") != hash_pw(password):
-        return False, "Incorrect password."
-    return True, users[u]
+    matched = find_user_key(users, u)
+    if not matched:
+        return False, f"Username '{u}' not found. Click '➕ Register New Account' to create this profile!", None
+    if users[matched].get("password_hash") != hash_pw(password):
+        return False, "Incorrect password. Please try again.", None
+    return True, users[matched], matched
 
 def record_player_round(username, round_score, won, distance_km):
     if not username:
@@ -1905,38 +1918,37 @@ def render_geoguessr_game():
                         st.session_state["player_username"] = None
                         st.rerun()
             else:
-                st.caption("Sign in or create a player profile so your scores and victories save to the Global Leaderboard:")
-                tab_in, tab_up = st.tabs(["🔑 Sign In", "➕ Create New User"])
-                with tab_in:
-                    with st.form("player_signin_form"):
-                        col_l1, col_l2 = st.columns(2)
-                        with col_l1:
-                            l_user = st.text_input("Username", key="login_username_field")
-                        with col_l2:
-                            l_pass = st.text_input("Password", type="password", key="login_password_field")
-                        if st.form_submit_button("Sign In to Play", use_container_width=True):
-                            ok, res_u = authenticate_user(l_user, l_pass)
-                            if ok:
-                                st.session_state["player_username"] = l_user.strip()
-                                st.success(f"Welcome back, {l_user.strip()}!")
-                                st.rerun()
-                            else:
-                                st.error(res_u)
-                with tab_up:
-                    with st.form("player_signup_form"):
-                        col_r1, col_r2 = st.columns(2)
-                        with col_r1:
-                            s_user = st.text_input("Choose Username (min 3 chars)", key="signup_username_field")
-                        with col_r2:
-                            s_pass = st.text_input("Create Password (min 4 chars)", type="password", key="signup_password_field")
-                        if st.form_submit_button("➕ Register Account", use_container_width=True):
-                            ok, msg = register_user(s_user, s_pass)
-                            if ok:
-                                st.session_state["player_username"] = s_user.strip()
-                                st.success(msg)
-                                st.rerun()
-                            else:
-                                st.error(msg)
+                st.caption("Enter your credentials below to **Sign In** or **Register as a New Player**:")
+                with st.form("player_unified_auth_form"):
+                    col_u, col_p = st.columns(2)
+                    with col_u:
+                        auth_user = st.text_input("Username", key="auth_user_input", placeholder="Enter username (e.g. straightfamily)...")
+                    with col_p:
+                        auth_pass = st.text_input("Password", type="password", key="auth_pass_input", placeholder="Enter password...")
+
+                    col_b_in, col_b_up = st.columns(2)
+                    with col_b_in:
+                        sign_in_sub = st.form_submit_button("🔑 Sign In to Play", use_container_width=True)
+                    with col_b_up:
+                        register_sub = st.form_submit_button("➕ Register New Account", use_container_width=True)
+
+                    if sign_in_sub:
+                        ok, msg, real_name = authenticate_user(auth_user, auth_pass)
+                        if ok:
+                            st.session_state["player_username"] = real_name
+                            st.success(f"Welcome back, {real_name}!")
+                            st.rerun()
+                        else:
+                            st.error(msg)
+
+                    if register_sub:
+                        ok, msg = register_user(auth_user, auth_pass)
+                        if ok:
+                            st.session_state["player_username"] = auth_user.strip()
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
 
         game_files, game_meta = load_game_deck()
 
