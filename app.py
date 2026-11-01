@@ -1675,15 +1675,95 @@ with st.sidebar:
 
     st.divider()
     if st.session_state.get("admin_logged_in"):
-        st.markdown("### 🧠 Auto-Train Engine <span class='clue-badge' style='background:rgba(0,255,163,0.15); color:#00FFA3; font-size:0.68rem; padding:2px 7px;'>ADMIN</span>", unsafe_allow_html=True)
-        st.caption(f"Admin Session Active • Visual Memory Slots: `{len(corrections)}`")
-        st.caption("Continuously fine-tune the Residual Vision Adapter across all local training exemplars:")
+        st.markdown("### 🧠 Admin Training & Ingestion Console <span class='clue-badge' style='background:rgba(0,255,163,0.15); color:#00FFA3; font-size:0.68rem; padding:2px 7px;'>ADMIN</span>", unsafe_allow_html=True)
+        st.caption(f"Admin Session Active • Indexed Places: `{len(locations)}` • Memory Slots: `{len(corrections)}`")
+
+        # Option 1: Trigger Model Training
         if st.button("🚀 Trigger Auto-Train", use_container_width=True):
             with st.spinner("Running automated Residual Vision Adapter training across dataset..."):
                 acc_init, acc_final, elapsed = run_auto_train(epochs=35)
                 st.success(f"🎉 **Auto-Train Complete!**\n\nAccuracy: **{acc_final:.1f}%** (was {acc_init:.1f}%)\n\nTime: {elapsed:.1f}s")
                 load_database.clear()
                 st.rerun()
+
+        # Option 2: Add New Location to Index & Train
+        with st.expander("➕ Add New Location & Train", expanded=False):
+            with st.form("admin_add_new_location_form"):
+                admin_loc_name = st.text_input("Location Name", placeholder="e.g. Kozhippara Waterfalls, Malappuram, Kerala")
+                admin_loc_cat = st.selectbox("Category Lens", [
+                    "Kerala - Micro-Region",
+                    "India - City/Hub",
+                    "India - State/UT",
+                    "Global"
+                ])
+                c_c1, c_c2 = st.columns(2)
+                with c_c1:
+                    admin_loc_country = st.text_input("Country", value="India")
+                with c_c2:
+                    admin_loc_region = st.text_input("State / Region", value="Kerala")
+
+                c_l1, c_l2 = st.columns(2)
+                with c_l1:
+                    admin_loc_lat = st.number_input("Latitude", value=10.0, format="%.4f")
+                with c_l2:
+                    admin_loc_lon = st.number_input("Longitude", value=76.0, format="%.4f")
+
+                admin_loc_side = st.selectbox("Traffic Driving Side", ["Left", "Right", "Unknown"])
+                admin_loc_prompt = st.text_area("Visual Cues / Street Prompt", placeholder="Describe scenery, architecture, vegetation, road markings...")
+
+                train_after = st.checkbox("Automatically re-train Residual Vision Adapter after adding", value=True)
+
+                if st.form_submit_button("💾 Save Location & Index", use_container_width=True):
+                    if admin_loc_name.strip():
+                        with st.spinner(f"Encoding '{admin_loc_name.strip()}' with StreetCLIP..."):
+                            processor, model, _ = get_vision_models()
+                            p_vis = admin_loc_prompt.strip() or f"a street photo in {admin_loc_name.strip()}"
+                            p_can = f"a street view photo in {admin_loc_name.strip()}"
+                            p_geo = f"a photo taken in {admin_loc_name.strip()}, {admin_loc_country.strip()}"
+                            with torch.no_grad():
+                                t_in = processor(text=[p_vis, p_can, p_geo], return_tensors="pt", padding=True, truncation=True, max_length=77)
+                                t_out = model.get_text_features(input_ids=t_in["input_ids"])
+                                t_raw = t_out.pooler_output if hasattr(t_out, "pooler_output") else t_out
+                                t_norm = t_raw / t_raw.norm(dim=-1, keepdim=True)
+                                comb_t = 0.50 * t_norm[0:1] + 0.30 * t_norm[1:2] + 0.20 * t_norm[2:3]
+                                new_vec = (comb_t / comb_t.norm(dim=-1, keepdim=True)).cpu()
+
+                            cache_data = torch.load(CACHE_FILE, weights_only=False)
+                            c_embs = cache_data["embeddings"]
+                            c_locs = cache_data["locations"]
+                            new_entry = {
+                                "name": admin_loc_name.strip(),
+                                "lat": float(admin_loc_lat),
+                                "lon": float(admin_loc_lon),
+                                "country": admin_loc_country.strip() or "Unknown",
+                                "region": admin_loc_region.strip() or "",
+                                "category": admin_loc_cat,
+                                "driving_side": admin_loc_side,
+                                "prompt": p_vis
+                            }
+
+                            matched_idx = None
+                            for idx, loc in enumerate(c_locs):
+                                if loc["name"].strip().lower() == admin_loc_name.strip().lower():
+                                    matched_idx = idx
+                                    break
+                            if matched_idx is not None:
+                                c_embs[matched_idx] = new_vec[0]
+                                c_locs[matched_idx] = new_entry
+                            else:
+                                c_embs = torch.cat([c_embs, new_vec], dim=0)
+                                c_locs.append(new_entry)
+                            torch.save({"embeddings": c_embs, "locations": c_locs}, CACHE_FILE)
+
+                            if train_after:
+                                run_auto_train(epochs=25)
+
+                            load_database.clear()
+                            st.success(f"🎉 Location '{admin_loc_name.strip()}' indexed successfully! Total places: {len(c_locs)}")
+                            st.rerun()
+                    else:
+                        st.error("Please enter a location name.")
+
         if st.button("🔒 Logout Admin", key="sidebar_logout_btn", use_container_width=True):
             st.session_state["admin_logged_in"] = False
             st.rerun()
