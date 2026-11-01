@@ -2006,14 +2006,20 @@ def render_geoguessr_game():
             if current_player:
                 all_u = load_users()
                 curr_u_data = all_u.get(current_player, {})
-                c_p1, c_p2, c_p3, c_p4 = st.columns([1.5, 1, 1, 1])
+                tot_p = curr_u_data.get('total_score', 0.0)
+                r_n = curr_u_data.get('rounds_played', 0)
+                avg_pts = (tot_p / r_n) if r_n > 0 else 0.0
+
+                c_p1, c_p2, c_p3, c_p4, c_p5 = st.columns([1.3, 1, 1, 1, 0.8])
                 with c_p1:
                     st.success(f"🎮 Active Player: **{current_player}**")
                 with c_p2:
-                    st.metric("Total Profile Score", f"{curr_u_data.get('total_score', 0.0):.1f} pts")
+                    st.metric("Total Score", f"{tot_p:.2f} pts")
                 with c_p3:
-                    st.metric("Record", f"{curr_u_data.get('wins', 0)}W - {curr_u_data.get('losses', 0)}L")
+                    st.metric("Avg / Guess", f"{avg_pts:.2f} / 5.0 pts")
                 with c_p4:
+                    st.metric("Record", f"{curr_u_data.get('wins', 0)}W - {curr_u_data.get('losses', 0)}L")
+                with c_p5:
                     if st.button("🚪 Log Out", key="logout_player_btn", use_container_width=True):
                         clear_active_session()
                         st.session_state["player_username"] = None
@@ -2368,16 +2374,39 @@ def render_geoguessr_game():
     # --- 🏆 Global Leaderboard Tab ---
     with leaderboard_tab:
         st.markdown("### 🏆 Global GeoGuessr Leaderboard")
-        st.caption("Top players ranked by total tournament points across all rounds:")
+        st.caption("Track world-class precision and average performance per guess across all registered players:")
+
         all_users = load_users()
         if not all_users:
             st.info("No players registered yet. Create an account in the Arena tab to join the leaderboard!")
         else:
-            ranked_players = sorted(
-                all_users.items(),
-                key=lambda x: (x[1].get("total_score", 0), x[1].get("wins", 0)),
-                reverse=True
-            )
+            rank_col1, _ = st.columns([2.5, 1])
+            with rank_col1:
+                rank_mode = st.radio(
+                    "Rank Leaderboard By:",
+                    ["🎯 Average Points per Guess (Precision & Accuracy)", "⭐ Total Career Score (Volume)"],
+                    horizontal=True,
+                    key="lb_rank_mode_toggle"
+                )
+
+            is_avg_mode = rank_mode.startswith("🎯")
+
+            if is_avg_mode:
+                ranked_players = sorted(
+                    all_users.items(),
+                    key=lambda x: (
+                        (x[1].get("total_score", 0.0) / max(1, x[1].get("rounds_played", 0))) if x[1].get("rounds_played", 0) > 0 else 0.0,
+                        x[1].get("total_score", 0.0),
+                        x[1].get("wins", 0)
+                    ),
+                    reverse=True
+                )
+            else:
+                ranked_players = sorted(
+                    all_users.items(),
+                    key=lambda x: (x[1].get("total_score", 0.0), x[1].get("wins", 0)),
+                    reverse=True
+                )
 
             # Top 3 Podium
             top_n = min(3, len(ranked_players))
@@ -2386,20 +2415,28 @@ def render_geoguessr_game():
             colors = ["#ffd700", "#c0c0c0", "#cd7f32"]
             for idx in range(top_n):
                 p_name, p_stats = ranked_players[idx]
+                r_n = p_stats.get("rounds_played", 0)
+                tot_p = p_stats.get("total_score", 0.0)
+                avg_p = (tot_p / r_n) if r_n > 0 else 0.0
+                primary_label = f"{avg_p:.2f} / 5.00 pts avg" if is_avg_mode else f"{tot_p:.2f} pts"
+                sub_label = f"{tot_p:.1f} Total Pts • {p_stats.get('wins', 0)}W ({r_n} Guesses)" if is_avg_mode else f"Avg: {avg_p:.2f} pts/guess • {p_stats.get('wins', 0)}W"
+
                 with podium_cols[idx]:
                     st.markdown(f"""
                     <div style="background: rgba(255,255,255,0.03); border: 2px solid {colors[idx]}; border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 15px;">
                         <h4 style="color: {colors[idx]}; margin: 0 0 6px 0;">{medals[idx]}</h4>
                         <h3 style="margin: 0; color: #ffffff;">{p_name}</h3>
-                        <p style="font-size: 1.25rem; font-weight: 700; color: #00FFA3; margin: 8px 0 4px 0;">{p_stats.get('total_score', 0):,} pts</p>
-                        <p style="font-size: 0.85rem; color: #94a3b8; margin: 0;">{p_stats.get('wins', 0)} Wins • {p_stats.get('rounds_played', 0)} Matches</p>
+                        <p style="font-size: 1.25rem; font-weight: 700; color: #00FFA3; margin: 8px 0 4px 0;">{primary_label}</p>
+                        <p style="font-size: 0.85rem; color: #94a3b8; margin: 0;">{sub_label}</p>
                     </div>
                     """, unsafe_allow_html=True)
 
-            # Leaderboard Table (NO Lat/Lon coordinates!)
+            # Leaderboard Table with Average Points per Guess
             leaderboard_data = []
             for rank, (p_name, p_stats) in enumerate(ranked_players, 1):
                 rounds = p_stats.get("rounds_played", 0)
+                total_pts = p_stats.get("total_score", 0.0)
+                avg_pts = (total_pts / rounds) if rounds > 0 else 0.0
                 wins = p_stats.get("wins", 0)
                 win_rate = f"{(wins / rounds * 100):.0f}%" if rounds > 0 else "0%"
                 best_d = f"{p_stats.get('best_distance_km')} km" if p_stats.get('best_distance_km') is not None else "N/A"
@@ -2407,11 +2444,12 @@ def render_geoguessr_game():
                 leaderboard_data.append({
                     "Rank": f"{badge}#{rank}",
                     "Player": p_name,
-                    "Total Points": f"{p_stats.get('total_score', 0.0):.1f} pts",
-                    "Matches": rounds,
+                    "🎯 Avg Points / Guess": f"{avg_pts:.2f} / 5.00 pts",
+                    "Total Points": f"{total_pts:.2f} pts",
+                    "Guesses": rounds,
                     "Wins": wins,
                     "Win Rate": win_rate,
-                    "Best Round": f"{p_stats.get('best_round_score', 0.0):.1f} / 5.0 pts",
+                    "Best Round": f"{p_stats.get('best_round_score', 0.0):.2f} / 5.0 pts",
                     "Closest Pin": best_d
                 })
 
