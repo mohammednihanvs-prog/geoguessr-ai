@@ -1859,94 +1859,27 @@ st.markdown("""
 
 
 # ==============================================================================
-# --- 🎮 GeoGuessr Arena & Leaderboard System ---
+# --- 🎮 GeoGuessr Arena & Leaderboard System (user_data Persistence) ---
 # ==============================================================================
-USERS_FILE = "users.json"
+import user_manager
+user_manager.init_user_storage()
+
+USER_DATA_DIR = user_manager.USER_DATA_DIR
+USERS_FILE = user_manager.USERS_FILE
 GAME_IMAGES_DIR = "game_images"
 GAME_METADATA_FILE = os.path.join(GAME_IMAGES_DIR, "game_metadata.json")
 
-def hash_pw(pw):
-    return hashlib.sha256(pw.encode("utf-8")).hexdigest()
-
-def load_users():
-    if not os.path.exists(USERS_FILE):
-        return {}
-    try:
-        with open(USERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-def save_users(users):
-    try:
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, indent=2)
-    except Exception as e:
-        print("Error saving users:", e)
-
-def find_user_key(users, username):
-    u_clean = username.strip()
-    if u_clean in users:
-        return u_clean
-    for k in users:
-        if k.lower() == u_clean.lower():
-            return k
-    return None
-
-def register_user(username, password):
-    u = username.strip()
-    if not u or len(u) < 3:
-        return False, "Username must be at least 3 characters."
-    if len(password) < 3:
-        return False, "Password must be at least 3 characters."
-    users = load_users()
-    matched = find_user_key(users, u)
-    if matched:
-        return False, f"Username '{matched}' already exists. Click 'Sign In' or choose another name."
-    users[u] = {
-        "password_hash": hash_pw(password),
-        "total_score": 0.0,
-        "rounds_played": 0,
-        "wins": 0,
-        "losses": 0,
-        "best_round_score": 0.0,
-        "best_distance_km": None
-    }
-    save_users(users)
-    return True, f"Player profile '{u}' created successfully!"
-
-def authenticate_user(username, password):
-    u = username.strip()
-    if not u:
-        return False, "Please enter your username.", None
-    users = load_users()
-    matched = find_user_key(users, u)
-    if not matched:
-        return False, f"Username '{u}' not found. Click '➕ Register New Account' to create this profile!", None
-    if users[matched].get("password_hash") != hash_pw(password):
-        return False, "Incorrect password. Please try again.", None
-    return True, users[matched], matched
-
-def record_player_round(username, round_score, won, distance_km):
-    if not username:
-        return
-    users = load_users()
-    if username not in users:
-        return
-    user = users[username]
-    user["total_score"] = round(user.get("total_score", 0.0) + round_score, 1)
-    user["rounds_played"] = user.get("rounds_played", 0) + 1
-    if won:
-        user["wins"] = user.get("wins", 0) + 1
-    else:
-        user["losses"] = user.get("losses", 0) + 1
-    if round_score > user.get("best_round_score", 0.0):
-        user["best_round_score"] = round(round_score, 1)
-    best_d = user.get("best_distance_km")
-    if best_d is None or distance_km < best_d:
-        user["best_distance_km"] = round(distance_km, 1)
-    users[username] = user
-    save_users(users)
+hash_pw = user_manager.hash_pw
+load_users = user_manager.load_users
+save_users = user_manager.save_users
+find_user_key = user_manager.find_user_key
+register_user = user_manager.register_user
+authenticate_user = user_manager.authenticate_user
+record_player_round = user_manager.record_player_round
+get_active_session_user = user_manager.get_active_session_user
+set_active_session_user = user_manager.set_active_session_user
+clear_active_session = user_manager.clear_active_session
+load_match_history = user_manager.load_match_history
 
 def load_game_deck():
     meta_dict = {}
@@ -2005,9 +1938,9 @@ def render_geoguessr_game():
         st.session_state["game_round_id"] = 1
     if "game_last_result" not in st.session_state:
         st.session_state["game_last_result"] = None
-    if "player_username" not in st.session_state:
-        st.session_state["player_username"] = None
-
+    if "player_username" not in st.session_state or not st.session_state["player_username"]:
+        persisted_user = get_active_session_user()
+        st.session_state["player_username"] = persisted_user
     current_player = st.session_state.get("player_username")
 
     # --- Top Navigation Tabs: Game Arena vs Global Leaderboard ---
@@ -2031,6 +1964,7 @@ def render_geoguessr_game():
                     st.metric("Record", f"{curr_u_data.get('wins', 0)}W - {curr_u_data.get('losses', 0)}L")
                 with c_p4:
                     if st.button("🚪 Log Out", key="logout_player_btn", use_container_width=True):
+                        clear_active_session()
                         st.session_state["player_username"] = None
                         st.rerun()
             else:
@@ -2225,9 +2159,21 @@ def render_geoguessr_game():
                             winner = "tie"
                             won_round = False
 
-                        # Record to persistent profile if player is signed in
-                        if current_player:
-                            record_player_round(current_player, user_score, won_round, user_dist)
+                        # Record to persistent profile (user_data/users.json & user_data/match_history.json)
+                        player_to_record = current_player or get_active_session_user() or "Guest"
+                        record_player_round(
+                            player_to_record,
+                            user_score,
+                            won_round,
+                            user_dist,
+                            extra_details={
+                                "image": current_file,
+                                "user_guess": guessed_label,
+                                "gt_name": gt_name,
+                                "ai_score": ai_score,
+                                "ai_dist": round(ai_dist, 1)
+                            }
+                        )
 
                         st.session_state["game_round_finished"] = True
                         st.session_state["game_last_result"] = {
@@ -2411,6 +2357,23 @@ def render_geoguessr_game():
                 })
 
             st.dataframe(leaderboard_data, use_container_width=True, hide_index=True)
+
+            # Match History Log from user_data/match_history.json
+            recent_matches = load_match_history(limit=25)
+            if recent_matches:
+                with st.expander("📜 Recent Match Activity Log (user_data/match_history.json)", expanded=False):
+                    history_table = []
+                    for m in recent_matches:
+                        t_str = m.get("timestamp", "")[:19].replace("T", " ")
+                        history_table.append({
+                            "Time": t_str,
+                            "Player": m.get("username", "Unknown"),
+                            "Result": "🏆 Win" if m.get("won") else "❌ Loss",
+                            "Score": f"{m.get('round_score', 0.0):.1f} / 5.0",
+                            "Distance": f"{m.get('distance_km', 0.0):.1f} km",
+                            "Challenge Location": m.get("gt_name", "Mystery Location")
+                        })
+                    st.dataframe(history_table, use_container_width=True, hide_index=True)
 
 # --- Operating Mode Selector ---
 st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)

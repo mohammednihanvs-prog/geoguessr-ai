@@ -6,6 +6,7 @@
     "wins": 0,
     "losses": 0,
     "best_round_score": 0.0,
-    "best_distance_km": null
+    "best_distance_km": null,
+    "last_active": "2026-11-01T19:05:24.560337"
   }
 }
