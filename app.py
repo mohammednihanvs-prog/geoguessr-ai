@@ -978,6 +978,291 @@ st.markdown("""
         }
     }
 
+    /* Earth-toned field atlas. Content and app behavior remain unchanged. */
+    :root {
+        --hud-bg-void: #111713;
+        --hud-bg-base: #1A2119;
+        --hud-bg-surface: rgba(31, 39, 29, 0.97);
+        --hud-bg-surface-elevated: #30382A;
+        --hud-bg-card: #222A20;
+        --hud-border: rgba(180, 177, 143, 0.2);
+        --hud-border-bright: rgba(181, 192, 137, 0.5);
+        --hud-border-focus: #B6C48A;
+        --hud-cyan: #B6C48A;
+        --hud-cyan-glow: rgba(182, 196, 138, 0.18);
+        --hud-cyan-subtle: rgba(182, 196, 138, 0.08);
+        --hud-amber: #D5A96B;
+        --hud-amber-glow: rgba(213, 169, 107, 0.17);
+        --hud-emerald: #9EB17A;
+        --hud-purple: #B8A57B;
+        --hud-crimson: #C98068;
+        --hud-text-primary: #E8E4D2;
+        --hud-text-secondary: #B4B5A0;
+        --hud-text-tertiary: #8C9380;
+        --hud-text-muted: #687263;
+        --apple-blue: #B6C48A;
+        --apple-blue-hover: #CBD5A3;
+        --apple-green: #9EB17A;
+        --apple-orange: #D5A96B;
+        --apple-text-primary: #E8E4D2;
+        --apple-text-secondary: #B4B5A0;
+        --apple-text-tertiary: #8C9380;
+        --radius-card: 16px;
+        --radius-sm: 10px;
+        --shadow-hud-sm: 0 3px 12px rgba(0, 0, 0, 0.2);
+        --shadow-hud: 0 10px 28px rgba(0, 0, 0, 0.2);
+        --shadow-hud-glow: 0 12px 32px rgba(0, 0, 0, 0.28);
+        --shadow-button-glow: 0 5px 16px rgba(125, 142, 82, 0.22);
+        --transition-smooth: all 0.18s ease;
+    }
+
+    html, body, .stApp, [data-testid="stAppViewContainer"] {
+        background-color: #111713 !important;
+        background-image:
+            repeating-radial-gradient(ellipse at 18% 22%, transparent 0 46px, rgba(194, 206, 152, 0.035) 47px 48px, transparent 49px 68px),
+            radial-gradient(ellipse 80% 36% at 50% -12%, rgba(100, 119, 69, 0.22), transparent 72%),
+            radial-gradient(ellipse 52% 35% at 100% 48%, rgba(177, 126, 65, 0.07), transparent 70%),
+            linear-gradient(180deg, #111713 0%, #1A2119 54%, #151B15 100%) !important;
+        color: #E8E4D2 !important;
+    }
+    .block-container {
+        max-width: 1440px !important;
+        padding: 2.4rem 2.2rem 5rem !important;
+    }
+    h1, h2, h3, h4, h5, h6 {
+        color: #E8E4D2 !important;
+        text-shadow: none !important;
+        letter-spacing: -0.035em !important;
+    }
+    p, label, [data-testid="stMarkdownContainer"] {
+        color: #D9D6C5;
+    }
+    .main-header {
+        font-size: clamp(2rem, 3.5vw, 3rem) !important;
+        line-height: 1.12 !important;
+        letter-spacing: -0.045em !important;
+        background-image: linear-gradient(105deg, #F0EBDD 12%, #C4CD9A 86%) !important;
+        text-shadow: none !important;
+    }
+    .main-subtitle {
+        max-width: 880px !important;
+        color: #B4B5A0 !important;
+        font-size: 1rem !important;
+        line-height: 1.75 !important;
+    }
+    .main-subtitle b { color: #C2CE98 !important; }
+
+    /* A quiet survey-strip treatment replaces the high-energy ticker feel. */
+    .hud-ticker-wrap {
+        border: 1px solid rgba(180, 177, 143, 0.16) !important;
+        border-radius: 12px !important;
+        background: rgba(29, 36, 26, 0.82) !important;
+        padding: 10px 0 !important;
+        margin: 1.3rem 0 1.9rem !important;
+        box-shadow: inset 3px 0 #B6C48A !important;
+        backdrop-filter: blur(12px) !important;
+    }
+    .hud-ticker-track {
+        animation-duration: 70s !important;
+        color: #B4B5A0 !important;
+        letter-spacing: 0.045em !important;
+    }
+    .hud-ticker-sep { color: #D5A96B !important; }
+
+    [data-testid="stSidebar"] {
+        background: rgba(22, 28, 21, 0.98) !important;
+        border-right: 1px solid rgba(180, 177, 143, 0.17) !important;
+        box-shadow: 8px 0 28px rgba(0, 0, 0, 0.18) !important;
+        backdrop-filter: blur(20px) !important;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3, [data-testid="stSidebar"] h4 {
+        color: #C2CE98 !important;
+        letter-spacing: 0.035em !important;
+    }
+    [data-testid="stSidebar"] hr, hr {
+        background: linear-gradient(90deg, transparent, rgba(161, 190, 181, 0.22), transparent) !important;
+    }
+
+    /* Consistent navigation and distinct active state. */
+    [data-testid="stTabs"] [role="tablist"] {
+        gap: 6px !important;
+        border-bottom: 1px solid rgba(180, 177, 143, 0.2) !important;
+    }
+    [data-testid="stTabs"] button[role="tab"] {
+        min-height: 46px !important;
+        padding: 0.7rem 1rem !important;
+        border-radius: 11px 11px 0 0 !important;
+        color: #B4B5A0 !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+        color: #C2CE98 !important;
+        background: rgba(182, 196, 138, 0.1) !important;
+        border-bottom-color: #B6C48A !important;
+    }
+    [data-testid="stTabs"] button[role="tab"]:hover { color: #E4E2D2 !important; }
+
+    /* Unified surfaces for metrics, bordered sections, alerts, and expanders. */
+    [data-testid="stMetric"], div[data-testid="stVerticalBlockBorderWrapper"],
+    [data-testid="stExpander"] details, .stAlert, div[data-testid="stNotification"] {
+        background: rgba(34, 42, 30, 0.96) !important;
+        border: 1px solid rgba(180, 177, 143, 0.18) !important;
+        border-radius: 15px !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+    }
+    [data-testid="stMetric"] {
+        padding: 17px 19px !important;
+        border-top: 2px solid rgba(114, 210, 179, 0.48) !important;
+    }
+    [data-testid="stMetric"]::before, [data-testid="stMetric"]::after { display: none !important; }
+    [data-testid="stMetric"]:hover,
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover { transform: none !important; }
+    [data-testid="stMetricLabel"] {
+        color: #B4B5A0 !important;
+        letter-spacing: 0.07em !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #F0EBDD !important;
+        text-shadow: none !important;
+    }
+    [data-testid="stExpander"] summary { color: #E4E2D2 !important; }
+    .stAlert, div[data-testid="stNotification"] {
+        border-left: 3px solid #B6C48A !important;
+        color: #E8E4D2 !important;
+    }
+
+    /* Buttons use one calm shape, with color reserved for the primary action. */
+    .stButton button, .stLinkButton a, [data-testid="stFormSubmitButton"] button {
+        min-height: 44px;
+        border-radius: 10px !important;
+        font-family: var(--font-body) !important;
+        font-weight: 650 !important;
+        text-transform: none !important;
+        letter-spacing: 0 !important;
+        box-shadow: none !important;
+        transition: background 160ms ease, border-color 160ms ease, transform 160ms ease !important;
+    }
+    .stButton button[kind="primary"], [data-testid="stFormSubmitButton"] button[kind="primary"] {
+        background: #B6C48A !important;
+        color: #202719 !important;
+        border: 1px solid #B6C48A !important;
+        box-shadow: 0 4px 14px rgba(125, 142, 82, 0.22) !important;
+    }
+    .stButton button[kind="primary"]:hover,
+    [data-testid="stFormSubmitButton"] button[kind="primary"]:hover {
+        background: #CBD5A3 !important;
+        border-color: #CBD5A3 !important;
+        transform: translateY(-1px) !important;
+    }
+    .stButton button:not([kind="primary"]), .stLinkButton a,
+    [data-testid="stFormSubmitButton"] button:not([kind="primary"]) {
+        background: #293226 !important;
+        color: #E4E2D2 !important;
+        border: 1px solid rgba(180, 177, 143, 0.27) !important;
+    }
+    .stButton button:not([kind="primary"]):hover, .stLinkButton a:hover {
+        background: #39432F !important;
+        border-color: rgba(114, 210, 179, 0.5) !important;
+        color: #F0EBDD !important;
+    }
+    button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible,
+    [role="combobox"]:focus-visible, [role="radio"]:focus-visible {
+        outline: 2px solid #CBD5A3 !important;
+        outline-offset: 3px !important;
+    }
+
+    /* Inputs, selectors, uploader and radio controls share a single surface language. */
+    [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,
+    [data-testid="stSelectbox"] [role="combobox"], [data-testid="stTextArea"] textarea,
+    [data-testid="stDateInput"] input {
+        background: #1A2119 !important;
+        color: #E8E4D2 !important;
+        border: 1px solid rgba(180, 177, 143, 0.27) !important;
+        border-radius: 10px !important;
+    }
+    [data-testid="stFileUploader"] section {
+        background: rgba(34, 42, 30, 0.78) !important;
+        border: 1px dashed rgba(114, 210, 179, 0.48) !important;
+        border-radius: 14px !important;
+        padding: 1rem !important;
+    }
+    [data-testid="stFileUploader"] section:hover {
+        background: rgba(49, 57, 37, 0.9) !important;
+        border-color: #CBD5A3 !important;
+    }
+    div[data-testid="stRadio"] > div {
+        background: rgba(34, 42, 30, 0.92) !important;
+        border-color: rgba(180, 177, 143, 0.2) !important;
+        border-radius: 12px !important;
+        box-shadow: none !important;
+    }
+    li[role="option"]:hover, li[role="option"][aria-selected="true"],
+    div[role="option"]:hover, div[role="option"][aria-selected="true"],
+    [data-rac="item"]:hover, [data-rac="item"][data-selected="true"] {
+        background: rgba(114, 210, 179, 0.13) !important;
+        color: #CBD5A3 !important;
+    }
+
+    /* Cartographic result details: muted map chrome with warm location markers. */
+    .breadcrumb-bar, .geo-score-card, .clue-inspector-card {
+        background: rgba(34, 42, 30, 0.96) !important;
+        border-color: rgba(161, 190, 181, 0.2) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22) !important;
+    }
+    .geo-score-card { border-left-color: #B6C48A !important; }
+    .bc-node, .score-title { color: #B4B5A0 !important; }
+    .bc-node b, .score-pts, .clue-val { color: #F0EBDD !important; text-shadow: none !important; }
+    .bc-node.active, .bc-node.active b { color: #C2CE98 !important; text-shadow: none !important; }
+    .bc-sep { color: #D5A96B !important; }
+    .score-badge, .badge-left {
+        color: #C2CE98 !important;
+        background: rgba(182, 196, 138, 0.1) !important;
+        border-color: rgba(114, 210, 179, 0.28) !important;
+        box-shadow: none !important;
+    }
+    .badge-right {
+        color: #D5A96B !important;
+        background: rgba(231, 185, 120, 0.09) !important;
+        border-color: rgba(231, 185, 120, 0.28) !important;
+    }
+    .badge-cat {
+        color: #D4C291 !important;
+        background: rgba(184, 165, 123, 0.1) !important;
+        border-color: rgba(184, 165, 123, 0.28) !important;
+    }
+    .clue-row { border-bottom-color: rgba(161, 190, 181, 0.12) !important; }
+    [data-testid="stImage"] img, div[data-testid="stCustomComponentV1"] iframe,
+    .element-container iframe {
+        border: 1px solid rgba(161, 190, 181, 0.2) !important;
+        border-radius: 14px !important;
+        box-shadow: 0 9px 26px rgba(0, 0, 0, 0.25) !important;
+    }
+    [data-testid="stSpinner"] > div { border-top-color: #B6C48A !important; }
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #B6C48A, #D5A96B) !important;
+        box-shadow: none !important;
+    }
+    ::-webkit-scrollbar-thumb { background: rgba(194, 206, 152, 0.32) !important; }
+    ::-webkit-scrollbar-thumb:hover { background: #B6C48A !important; box-shadow: none !important; }
+
+    @media (max-width: 768px) {
+        .block-container { padding: 1.5rem 1rem 3.5rem !important; }
+        .main-header { font-size: clamp(1.75rem, 7vw, 2.35rem) !important; }
+        .main-subtitle { font-size: 0.94rem !important; }
+        [data-testid="stTabs"] [role="tablist"] { overflow-x: auto; }
+        [data-testid="stTabs"] button[role="tab"] { white-space: nowrap; }
+        [data-testid="stMetric"] { padding: 14px !important; }
+        [data-testid="stMetricValue"] { font-size: 1.35rem !important; }
+        .breadcrumb-bar { border-radius: 12px !important; }
+    }
+    @media (hover: none) {
+        [data-testid="stMetric"]:hover,
+        div[data-testid="stVerticalBlockBorderWrapper"]:hover { transform: none !important; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .hud-ticker-track { animation: none !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
