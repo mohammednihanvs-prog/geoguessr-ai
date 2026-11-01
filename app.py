@@ -7,6 +7,8 @@ import os
 import sys
 import glob
 import json
+import math
+import random
 import urllib.request
 import urllib.parse
 import streamlit as st
@@ -1646,7 +1648,7 @@ def get_map_urls(lat, lon):
 with st.sidebar:
     st.markdown("### 🌐 AI Model Telemetry")
     adapter_status = "✅ Active (Trained)" if adapter is not None else "⚡ Zero-Shot Mode"
-    st.info(f"**Vision Adapter:** {adapter_status}\n\n**Total Indexed Places:** `{len(locations)}`\n\n**Visual Corrections:** `{len(corrections)}`")
+    st.info(f"**Vision Adapter:** {adapter_status}\n\n**Total Indexed Places:** `{len(locations)}`")
 
     st.divider()
     st.subheader("🎯 Prediction Scope Lens")
@@ -1673,6 +1675,7 @@ with st.sidebar:
     st.divider()
     if st.session_state.get("admin_logged_in"):
         st.markdown("### 🧠 Auto-Train Engine <span class='clue-badge' style='background:rgba(0,255,163,0.15); color:#00FFA3; font-size:0.68rem; padding:2px 7px;'>ADMIN</span>", unsafe_allow_html=True)
+        st.caption(f"Admin Session Active • Visual Memory Slots: `{len(corrections)}`")
         st.caption("Continuously fine-tune the Residual Vision Adapter across all local training exemplars:")
         if st.button("🚀 Trigger Auto-Train", use_container_width=True):
             with st.spinner("Running automated Residual Vision Adapter training across dataset..."):
@@ -1736,6 +1739,334 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+
+# ==============================================================================
+# --- 🎮 GeoGuessr Arena: Human vs AI Battle Mode ---
+# ==============================================================================
+GAME_IMAGES_DIR = "game_images"
+GAME_METADATA_FILE = os.path.join(GAME_IMAGES_DIR, "game_metadata.json")
+
+def load_game_deck():
+    meta_dict = {}
+    if os.path.exists(GAME_METADATA_FILE):
+        try:
+            with open(GAME_METADATA_FILE, "r", encoding="utf-8") as f:
+                items = json.load(f)
+                for it in items:
+                    meta_dict[it["filename"]] = it
+        except Exception:
+            pass
+    valid_exts = (".jpg", ".jpeg", ".png", ".webp")
+    if os.path.exists(GAME_IMAGES_DIR):
+        files = [f for f in os.listdir(GAME_IMAGES_DIR) if f.lower().endswith(valid_exts)]
+    else:
+        files = []
+    return files, meta_dict
+
+def calculate_haversine(lat1, lon1, lat2, lon2):
+    R = 6371.0 # Earth radius in km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2.0) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2.0) ** 2
+    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+    return R * c
+
+def compute_geoguessr_score(dist_km):
+    if dist_km <= 0.05:
+        return 5000
+    score = int(round(5000.0 * math.exp(-dist_km / 2000.0)))
+    return max(0, min(5000, score))
+
+def render_geoguessr_game():
+    # Ensure game session state variables
+    if "game_rounds" not in st.session_state:
+        st.session_state["game_rounds"] = 0
+    if "game_user_score" not in st.session_state:
+        st.session_state["game_user_score"] = 0
+    if "game_ai_score" not in st.session_state:
+        st.session_state["game_ai_score"] = 0
+    if "game_user_wins" not in st.session_state:
+        st.session_state["game_user_wins"] = 0
+    if "game_ai_wins" not in st.session_state:
+        st.session_state["game_ai_wins"] = 0
+    if "game_current_img" not in st.session_state:
+        st.session_state["game_current_img"] = None
+    if "game_round_finished" not in st.session_state:
+        st.session_state["game_round_finished"] = False
+    if "game_round_id" not in st.session_state:
+        st.session_state["game_round_id"] = 1
+    if "game_last_result" not in st.session_state:
+        st.session_state["game_last_result"] = None
+
+    game_files, game_meta = load_game_deck()
+
+    if not game_files:
+        st.error("⚠️ No challenge images found in `game_images/` directory. Please populate the folder to play.")
+        return
+
+    if st.session_state["game_current_img"] not in game_files:
+        st.session_state["game_current_img"] = random.choice(game_files)
+        st.session_state["game_round_finished"] = False
+        st.session_state["game_last_result"] = None
+
+    current_file = st.session_state["game_current_img"]
+    curr_meta = game_meta.get(current_file, {})
+
+    # Top Control & Scoreboard Bar
+    score_c1, score_c2, score_c3, score_c4 = st.columns([1, 1, 1.2, 1.2])
+    with score_c1:
+        st.metric("👤 Your Total Score", f"{st.session_state['game_user_score']:,} pts")
+    with score_c2:
+        st.metric("🤖 AI Total Score", f"{st.session_state['game_ai_score']:,} pts")
+    with score_c3:
+        st.metric("🏆 Battle Record", f"{st.session_state['game_user_wins']}W - {st.session_state['game_ai_wins']}L ({st.session_state['game_rounds']} Rounds)")
+    with score_c4:
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            if st.button("🎲 Deal New", use_container_width=True, help="Deal a new random challenge image"):
+                st.session_state["game_current_img"] = random.choice(game_files)
+                st.session_state["game_round_finished"] = False
+                st.session_state["game_last_result"] = None
+                st.session_state["game_round_id"] += 1
+                st.rerun()
+        with col_b2:
+            if st.button("🔄 Reset", use_container_width=True, help="Reset tournament score"):
+                st.session_state["game_rounds"] = 0
+                st.session_state["game_user_score"] = 0
+                st.session_state["game_ai_score"] = 0
+                st.session_state["game_user_wins"] = 0
+                st.session_state["game_ai_wins"] = 0
+                st.session_state["game_round_finished"] = False
+                st.session_state["game_last_result"] = None
+                st.rerun()
+
+    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+    col_g_left, col_g_right = st.columns([1, 1], gap="medium")
+
+    with col_g_left:
+        st.markdown(f"#### 🖼️ Mystery Challenge Scene (Round #{st.session_state['game_round_id']})")
+        img_path = os.path.join(GAME_IMAGES_DIR, current_file)
+        try:
+            g_img = Image.open(img_path).convert("RGB")
+            st.image(g_img, use_container_width=True, caption=f"Random Mystery Challenge: {current_file}")
+        except Exception as e:
+            st.error(f"Error opening image: {e}")
+            g_img = None
+
+        with st.expander("💡 Tactical Clues & Environmental Hints", expanded=False):
+            if curr_meta.get("driving_side"):
+                st.write(f"🚗 **Road Rule:** Vehicles drive on the **{curr_meta['driving_side']}**")
+            if curr_meta.get("category"):
+                st.write(f"🌐 **Scope Domain:** {curr_meta['category']}")
+            if "lat" in curr_meta:
+                hem = "Northern" if curr_meta["lat"] >= 0 else "Southern"
+                st.write(f"🧭 **Hemisphere:** {hem} Hemisphere")
+            st.caption("Clues: inspect architectural nuances, road markings, flora, utility poles, and signage scripts.")
+
+    with col_g_right:
+        if not st.session_state["game_round_finished"]:
+            st.markdown("#### 🎯 Pin Your Guess")
+            st.caption("Select a known location from the database or enter custom coordinates:")
+
+            loc_names = ["-- Choose from 475+ indexed places --"] + [l["name"] for l in locations]
+            selected_place = st.selectbox("📍 Quick Location Selector:", loc_names, index=0, key=f"place_sel_{st.session_state['game_round_id']}")
+
+            default_lat = 20.0
+            default_lon = 78.0
+            if selected_place != loc_names[0]:
+                for l in locations:
+                    if l["name"] == selected_place:
+                        default_lat = l["lat"]
+                        default_lon = l["lon"]
+                        break
+
+            col_u_lat, col_u_lon = st.columns(2)
+            with col_u_lat:
+                guessed_lat = st.number_input("Latitude", value=float(default_lat), min_value=-90.0, max_value=90.0, step=0.01, format="%.4f", key=f"lat_in_{st.session_state['game_round_id']}")
+            with col_u_lon:
+                guessed_lon = st.number_input("Longitude", value=float(default_lon), min_value=-180.0, max_value=180.0, step=0.01, format="%.4f", key=f"lon_in_{st.session_state['game_round_id']}")
+
+            g_map = folium.Map(location=[guessed_lat, guessed_lon], zoom_start=3, tiles="CartoDB dark_matter")
+            folium.Marker(
+                [guessed_lat, guessed_lon],
+                popup="Your Selected Pin",
+                tooltip="Your Guess Pin",
+                icon=folium.Icon(color="blue", icon="user", prefix="fa")
+            ).add_to(g_map)
+            st_folium(g_map, height=280, width="100%", key=f"guess_folium_{st.session_state['game_round_id']}")
+
+            if st.button("⚔️ Lock In Guess & Challenge AI!", type="primary", use_container_width=True):
+                if g_img is not None:
+                    with st.spinner("🤖 StreetCLIP AI is predicting location..."):
+                        ai_ranked, _ = predict_location(g_img, text_embeddings, locations, corrections_list=None, category_filter="All")
+                        ai_top = ai_ranked[0]
+
+                    gt = curr_meta if curr_meta else {
+                        "name": ai_top["name"],
+                        "lat": ai_top["lat"],
+                        "lon": ai_top["lon"],
+                        "country": ai_top.get("country", "")
+                    }
+                    gt_lat = float(gt["lat"])
+                    gt_lon = float(gt["lon"])
+                    gt_name = gt["name"]
+
+                    user_dist = calculate_haversine(guessed_lat, guessed_lon, gt_lat, gt_lon)
+                    ai_dist = calculate_haversine(float(ai_top["lat"]), float(ai_top["lon"]), gt_lat, gt_lon)
+
+                    user_score = compute_geoguessr_score(user_dist)
+                    ai_score = compute_geoguessr_score(ai_dist)
+
+                    st.session_state["game_rounds"] += 1
+                    st.session_state["game_user_score"] += user_score
+                    st.session_state["game_ai_score"] += ai_score
+
+                    if user_dist < ai_dist:
+                        st.session_state["game_user_wins"] += 1
+                        winner = "user"
+                    elif ai_dist < user_dist:
+                        st.session_state["game_ai_wins"] += 1
+                        winner = "ai"
+                    else:
+                        winner = "tie"
+
+                    st.session_state["game_round_finished"] = True
+                    st.session_state["game_last_result"] = {
+                        "winner": winner,
+                        "gt_name": gt_name,
+                        "gt_lat": gt_lat,
+                        "gt_lon": gt_lon,
+                        "gt_country": gt.get("country", ""),
+                        "user_lat": guessed_lat,
+                        "user_lon": guessed_lon,
+                        "user_dist": user_dist,
+                        "user_score": user_score,
+                        "ai_name": ai_top["name"],
+                        "ai_lat": float(ai_top["lat"]),
+                        "ai_lon": float(ai_top["lon"]),
+                        "ai_conf": float(ai_top["confidence"]),
+                        "ai_dist": ai_dist,
+                        "ai_score": ai_score
+                    }
+                    st.rerun()
+        else:
+            res = st.session_state["game_last_result"]
+            st.markdown("#### 🏁 Battle Results")
+
+            if res["winner"] == "user":
+                st.balloons()
+                diff = res['ai_dist'] - res['user_dist']
+                st.success(f"🏆 **YOU WIN!** You landed within **{res['user_dist']:.1f} km** (+{res['user_score']:,} pts), beating AI by **{diff:.1f} km**!")
+            elif res["winner"] == "ai":
+                diff = res['user_dist'] - res['ai_dist']
+                st.error(f"🤖 **AI WINS!** StreetCLIP landed within **{res['ai_dist']:.1f} km** (+{res['ai_score']:,} pts), beating you by **{diff:.1f} km**!")
+            else:
+                st.info(f"🤝 **TIE!** You and the AI landed equally close!")
+
+            col_r_user, col_r_ai = st.columns(2)
+            with col_r_user:
+                st.markdown(f"""
+                <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px;">
+                    <h4 style="margin: 0; color: #60a5fa;">👤 You</h4>
+                    <p style="margin: 4px 0 0 0; font-size: 0.9rem;">Distance Error: <b>{res['user_dist']:.1f} km</b></p>
+                    <p style="margin: 4px 0 0 0; font-size: 1.1rem; color: #93c5fd;"><b>+{res['user_score']:,} pts</b></p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col_r_ai:
+                st.markdown(f"""
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px;">
+                    <h4 style="margin: 0; color: #f87171;">🤖 StreetCLIP AI</h4>
+                    <p style="margin: 4px 0 0 0; font-size: 0.9rem;">Guess: <b>{res['ai_name']}</b></p>
+                    <p style="margin: 4px 0 0 0; font-size: 0.9rem;">Distance Error: <b>{res['ai_dist']:.1f} km</b> ({res['ai_conf']*100:.1f}%)</p>
+                    <p style="margin: 4px 0 0 0; font-size: 1.1rem; color: #fca5a5;"><b>+{res['ai_score']:,} pts</b></p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+            gt_gmaps, gt_earth, _ = get_map_urls(res["gt_lat"], res["gt_lon"])
+            st.info(f"🎯 **Actual Ground Truth:** **{res['gt_name']}** (`{res['gt_lat']:.4f}`, `{res['gt_lon']:.4f}`)\n\n[Google Maps]({gt_gmaps}) · [Google Earth 3D]({gt_earth})")
+
+            if st.button("🎲 Next Mystery Location ➡️", type="primary", use_container_width=True):
+                st.session_state["game_current_img"] = random.choice(game_files)
+                st.session_state["game_round_finished"] = False
+                st.session_state["game_last_result"] = None
+                st.session_state["game_round_id"] += 1
+                st.rerun()
+
+    # Triangulation Map when round is finished
+    if st.session_state.get("game_round_finished") and st.session_state.get("game_last_result"):
+        res = st.session_state["game_last_result"]
+        st.divider()
+        st.markdown("### 🗺️ Triangulation Map: Ground Truth vs You vs AI")
+        st.caption("🟢 Green Star = Ground Truth | 🔵 Blue User = Your Guess | 🔴 Red Cog = StreetCLIP AI Guess")
+
+        tri_map = folium.Map(location=[res["gt_lat"], res["gt_lon"]], zoom_start=4, tiles="CartoDB dark_matter")
+
+        folium.Marker(
+            [res["gt_lat"], res["gt_lon"]],
+            popup=f"🎯 Actual: {res['gt_name']}",
+            tooltip=f"🎯 Ground Truth: {res['gt_name']}",
+            icon=folium.Icon(color="green", icon="star", prefix="fa")
+        ).add_to(tri_map)
+
+        folium.Marker(
+            [res["user_lat"], res["user_lon"]],
+            popup=f"👤 Your Guess ({res['user_dist']:.1f} km off)",
+            tooltip=f"👤 Your Guess ({res['user_dist']:.1f} km off)",
+            icon=folium.Icon(color="blue", icon="user", prefix="fa")
+        ).add_to(tri_map)
+
+        folium.Marker(
+            [res["ai_lat"], res["ai_lon"]],
+            popup=f"🤖 AI Guess: {res['ai_name']} ({res['ai_dist']:.1f} km off)",
+            tooltip=f"🤖 AI Guess: {res['ai_name']} ({res['ai_dist']:.1f} km off)",
+            icon=folium.Icon(color="red", icon="cog", prefix="fa")
+        ).add_to(tri_map)
+
+        folium.PolyLine(
+            locations=[[res["user_lat"], res["user_lon"]], [res["gt_lat"], res["gt_lon"]]],
+            color="#3b82f6",
+            weight=3,
+            opacity=0.8,
+            dash_array="6, 8",
+            tooltip=f"Your Error: {res['user_dist']:.1f} km"
+        ).add_to(tri_map)
+
+        folium.PolyLine(
+            locations=[[res["ai_lat"], res["ai_lon"]], [res["gt_lat"], res["gt_lon"]]],
+            color="#ef4444",
+            weight=3,
+            opacity=0.8,
+            dash_array="6, 8",
+            tooltip=f"AI Error: {res['ai_dist']:.1f} km"
+        ).add_to(tri_map)
+
+        lats = [res["gt_lat"], res["user_lat"], res["ai_lat"]]
+        lons = [res["gt_lon"], res["user_lon"], res["ai_lon"]]
+        min_lat, max_lat = min(lats), max(lats)
+        min_lon, max_lon = min(lons), max(lons)
+        pad_lat = max(2.0, (max_lat - min_lat) * 0.15)
+        pad_lon = max(2.0, (max_lon - min_lon) * 0.15)
+        tri_map.fit_bounds([[min_lat - pad_lat, min_lon - pad_lon], [max_lat + pad_lat, max_lon + pad_lon]])
+
+        st_folium(tri_map, height=450, width="100%", key=f"tri_map_{st.session_state['game_round_id']}")
+
+# --- Operating Mode Selector ---
+st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+app_mode = st.radio(
+    "Choose Operating Mode:",
+    ["🔍 AI Location Detective (Single Image Inspector)", "🎮 Play with GeoGuessr (Human vs AI Battle)"],
+    horizontal=True,
+    key="global_app_mode_toggle"
+)
+st.divider()
+
+if app_mode.startswith("🎮"):
+    render_geoguessr_game()
+    st.stop()
+
 
 # Show correction success alert if just updated
 if "just_corrected" in st.session_state:
@@ -2153,26 +2484,10 @@ with col_right:
                     st.progress(min(1.0, float(item['confidence'] * 2.0)))
                     st.caption(f"**{item['confidence']*100:.2f}%**")
 
-        # Feedback & Active Retraining
-        st.divider()
-        st.subheader("3. Human-in-the-Loop Active Retraining")
-        if not st.session_state.get("admin_logged_in"):
-            st.info("🔒 **Admin Authentication Required:** Retraining the model and modifying visual memory requires administrator privileges.")
-            with st.expander("🔑 Admin Login to Access Active Retraining", expanded=False):
-                with st.form("admin_login_main_form"):
-                    col_u, col_p = st.columns(2)
-                    with col_u:
-                        m_user = st.text_input("Username", key="main_admin_user")
-                    with col_p:
-                        m_pass = st.text_input("Password", type="password", key="main_admin_pass")
-                    if st.form_submit_button("Unlock Retraining Controls", use_container_width=True):
-                        if m_user.strip() == "straightfamily" and m_pass == "gayless":
-                            st.session_state["admin_logged_in"] = True
-                            st.success("Admin authenticated successfully!")
-                            st.rerun()
-                        else:
-                            st.error("Invalid admin username or password.")
-        else:
+        # Feedback & Active Retraining (Admin Console Only - Hidden for standard users)
+        if st.session_state.get("admin_logged_in"):
+            st.divider()
+            st.subheader("3. Human-in-the-Loop Active Retraining (Admin Console)")
             st.caption("Did the AI get it wrong? Correct it here. The visual fingerprint memory will permanently remember this scene without catastrophic forgetting.")
 
             feedback_choice = st.radio(
