@@ -1671,14 +1671,33 @@ with st.sidebar:
     selected_scope = scope_mapping[scope_choice]
 
     st.divider()
-    st.markdown("### 🧠 Auto-Train Engine")
-    st.caption("Continuously fine-tune the Residual Vision Adapter across all local training exemplars:")
-    if st.button("🚀 Trigger Auto-Train", use_container_width=True):
-        with st.spinner("Running automated Residual Vision Adapter training across dataset..."):
-            acc_init, acc_final, elapsed = run_auto_train(epochs=35)
-            st.success(f"🎉 **Auto-Train Complete!**\n\nAccuracy: **{acc_final:.1f}%** (was {acc_init:.1f}%)\n\nTime: {elapsed:.1f}s")
-            load_database.clear()
+    if st.session_state.get("admin_logged_in"):
+        st.markdown("### 🧠 Auto-Train Engine <span class='clue-badge' style='background:rgba(0,255,163,0.15); color:#00FFA3; font-size:0.68rem; padding:2px 7px;'>ADMIN</span>", unsafe_allow_html=True)
+        st.caption("Continuously fine-tune the Residual Vision Adapter across all local training exemplars:")
+        if st.button("🚀 Trigger Auto-Train", use_container_width=True):
+            with st.spinner("Running automated Residual Vision Adapter training across dataset..."):
+                acc_init, acc_final, elapsed = run_auto_train(epochs=35)
+                st.success(f"🎉 **Auto-Train Complete!**\n\nAccuracy: **{acc_final:.1f}%** (was {acc_init:.1f}%)\n\nTime: {elapsed:.1f}s")
+                load_database.clear()
+                st.rerun()
+        if st.button("🔒 Logout Admin", key="sidebar_logout_btn", use_container_width=True):
+            st.session_state["admin_logged_in"] = False
             st.rerun()
+    else:
+        st.markdown("### 🔐 Admin Training Console")
+        st.caption("Auto-training and model fine-tuning are protected. Login as admin to unlock training controls:")
+        with st.expander("🔑 Admin Login to Train", expanded=False):
+            with st.form("admin_login_sidebar_form"):
+                admin_user = st.text_input("Username", key="sb_admin_user")
+                admin_pass = st.text_input("Password", type="password", key="sb_admin_pass")
+                login_btn = st.form_submit_button("Unlock Training", use_container_width=True)
+                if login_btn:
+                    if admin_user.strip() == "straightfamily" and admin_pass == "gayless":
+                        st.session_state["admin_logged_in"] = True
+                        st.success("Admin authenticated successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid admin username or password.")
 
     st.divider()
     st.markdown("### 🗺️ Satellite & Earth Meta")
@@ -2137,193 +2156,210 @@ with col_right:
         # Feedback & Active Retraining
         st.divider()
         st.subheader("3. Human-in-the-Loop Active Retraining")
-        st.caption("Did the AI get it wrong? Correct it here. The visual fingerprint memory will permanently remember this scene without catastrophic forgetting.")
-
-        feedback_choice = st.radio(
-            "Did the AI guess correctly?",
-            (
-                "✅ Yes, prediction is correct",
-                "🔍 No, choose from available options (Search database)",
-                "➕ No, register a new location"
-            ),
-            index=0,
-            horizontal=False
-        )
-
-        # Unique locations pool (strictly deduplicated by lowercase name)
-        unique_loc_pool = {}
-        for loc in locations:
-            k = loc["name"].strip().lower()
-            if k not in unique_loc_pool:
-                unique_loc_pool[k] = loc
-        unique_loc_list = list(unique_loc_pool.values())
-
-        target_name = None
-        descriptors = ""
-        reg_country = ""
-        reg_region = ""
-        reg_category = ""
-        reg_driving = "Left"
-
-        if feedback_choice == "✅ Yes, prediction is correct":
-            target_name = top_pick["name"]
-            descriptors = ""
-            reg_country = top_pick.get("country", "")
-            reg_region = top_pick.get("region", "")
-            reg_category = top_pick.get("category", "")
-            reg_driving = top_pick.get("driving_side", "Left")
-            st.info(f"Retraining on this image will reinforce the AI's confidence for **{target_name}**.")
-
-        elif feedback_choice == "🔍 No, choose from available options (Search database)":
-            st.markdown("##### 🔍 Search Available Locations")
-            
-            c_s1, c_s2 = st.columns([3, 2])
-            with c_s1:
-                search_query = st.text_input(
-                    "Search locations by name, city, state, or country:",
-                    placeholder="Type to filter... (e.g. Kozhikode, Munich, Tokyo, Wayanad, France, Kerala)",
-                    key="loc_search_query"
-                )
-            with c_s2:
-                all_cats = ["All Categories"] + sorted(list({l.get("category", "") for l in unique_loc_list if l.get("category")}))
-                selected_cat = st.selectbox("Filter by Category:", all_cats, key="loc_filter_cat")
-
-            # Real-time search filtering
-            q = search_query.strip().lower() if search_query else ""
-            matching_locations = []
-            for loc in unique_loc_list:
-                if selected_cat != "All Categories" and loc.get("category") != selected_cat:
-                    continue
-                if not q:
-                    matching_locations.append(loc)
-                else:
-                    search_haystack = f"{loc['name']} {loc.get('country', '')} {loc.get('region', '')} {loc.get('category', '')} {loc.get('prompt', '')}".lower()
-                    if q in search_haystack:
-                        matching_locations.append(loc)
-
-            if not matching_locations:
-                st.warning(f"❌ No existing location matches **'{search_query}'**.")
-                st.info("💡 To keep the database clean and prevent duplicate entries, check your search spelling. If this place is genuinely not in the database, choose **'➕ No, register a new location'** above.")
-            else:
-                st.caption(f"Showing **{len(matching_locations)}** matching location(s) out of {len(unique_loc_list)} total places:")
-
-                # Build options map with rich informative labels
-                option_map = {}
-                for loc in matching_locations:
-                    driving_str = "🚗 Driving: Left" if loc.get("driving_side") == "Left" else "🚙 Driving: Right"
-                    country_info = f" | {loc.get('country', '')}" if loc.get('country') else ""
-                    label = f"📍 {loc['name']} — [{loc.get('category', 'Place')}{country_info} | {driving_str}]"
-                    option_map[label] = loc
-
-                chosen_label = st.selectbox(
-                    "Select correct location from matching results:",
-                    options=list(option_map.keys()),
-                    key="selected_loc_dropdown"
-                )
-
-                matched_loc = option_map[chosen_label]
-                target_name = matched_loc["name"]
-                reg_country = matched_loc.get("country", "")
-                reg_region = matched_loc.get("region", "")
-                reg_category = matched_loc.get("category", "")
-                reg_driving = matched_loc.get("driving_side", "Left")
-                descriptors = ""
-
-                # Display card confirming selection & duplicate prevention guarantee
-                st.markdown(
-                    f"<div style='background:rgba(0, 255, 163, 0.08); border:1px solid rgba(0, 255, 163, 0.28); border-left:4px solid #00FFA3; padding:12px 16px; border-radius:12px; margin:8px 0 12px 0; box-shadow:0 0 20px rgba(0, 255, 163, 0.12);'>"
-                    f"<b style='color:#FFFFFF; font-family:var(--font-display);'>Selected Target:</b> <span style='color:#00F0FF; font-weight:600;'>{matched_loc['name']}</span><br/>"
-                    f"<span style='color:var(--hud-text-secondary); font-size:0.88rem;'>Category: <code style='background:rgba(0, 240, 255, 0.12); color:#00F0FF; border:1px solid rgba(0, 240, 255, 0.3);'>{reg_category}</code> | Country: <b style='color:#FFFFFF;'>{reg_country}</b> | Region: <b style='color:#FFFFFF;'>{reg_region}</b> | Driving: <b style='color:#00FFA3;'>{reg_driving}</b></span><br/>"
-                    f"<span style='color:#00FFA3; font-size:0.82rem; font-weight:600; font-family:var(--font-mono);'>🛡️ Duplicate Protection Active: Updates existing place in-place without duplicating.</span>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-
+        if not st.session_state.get("admin_logged_in"):
+            st.info("🔒 **Admin Authentication Required:** Retraining the model and modifying visual memory requires administrator privileges.")
+            with st.expander("🔑 Admin Login to Access Active Retraining", expanded=False):
+                with st.form("admin_login_main_form"):
+                    col_u, col_p = st.columns(2)
+                    with col_u:
+                        m_user = st.text_input("Username", key="main_admin_user")
+                    with col_p:
+                        m_pass = st.text_input("Password", type="password", key="main_admin_pass")
+                    if st.form_submit_button("Unlock Retraining Controls", use_container_width=True):
+                        if m_user.strip() == "straightfamily" and m_pass == "gayless":
+                            st.session_state["admin_logged_in"] = True
+                            st.success("Admin authenticated successfully!")
+                            st.rerun()
+                        else:
+                            st.error("Invalid admin username or password.")
         else:
-            st.markdown("##### ➕ Register a New Location")
-            target_name = st.text_input(
-                "Exact Place Name:",
-                placeholder="e.g. Kozhencherry, Pathanamthitta, Kerala, India",
-                help="Enter the canonical name for this place."
+            st.caption("Did the AI get it wrong? Correct it here. The visual fingerprint memory will permanently remember this scene without catastrophic forgetting.")
+
+            feedback_choice = st.radio(
+                "Did the AI guess correctly?",
+                (
+                    "✅ Yes, prediction is correct",
+                    "🔍 No, choose from available options (Search database)",
+                    "➕ No, register a new location"
+                ),
+                index=0,
+                horizontal=False
             )
 
-            # Active Duplicate Detection & Warning
-            if target_name and target_name.strip():
-                clean_input = target_name.strip().lower()
-                
-                # 1. Exact match check
-                exact_dup = next((l for l in unique_loc_list if l["name"].strip().lower() == clean_input), None)
-                if exact_dup:
-                    st.warning(
-                        f"⚠️ **Duplicate Alert:** '{exact_dup['name']}' already exists in the database!\n\n"
-                        f"Retraining with this name will update the existing location in-place, preventing any duplicate entries."
+            # Unique locations pool (strictly deduplicated by lowercase name)
+            unique_loc_pool = {}
+            for loc in locations:
+                k = loc["name"].strip().lower()
+                if k not in unique_loc_pool:
+                    unique_loc_pool[k] = loc
+            unique_loc_list = list(unique_loc_pool.values())
+
+            target_name = None
+            descriptors = ""
+            reg_country = ""
+            reg_region = ""
+            reg_category = ""
+            reg_driving = "Left"
+
+            if feedback_choice == "✅ Yes, prediction is correct":
+                target_name = top_pick["name"]
+                descriptors = ""
+                reg_country = top_pick.get("country", "")
+                reg_region = top_pick.get("region", "")
+                reg_category = top_pick.get("category", "")
+                reg_driving = top_pick.get("driving_side", "Left")
+                st.info(f"Retraining on this image will reinforce the AI's confidence for **{target_name}**.")
+
+            elif feedback_choice == "🔍 No, choose from available options (Search database)":
+                st.markdown("##### 🔍 Search Available Locations")
+            
+                c_s1, c_s2 = st.columns([3, 2])
+                with c_s1:
+                    search_query = st.text_input(
+                        "Search locations by name, city, state, or country:",
+                        placeholder="Type to filter... (e.g. Kozhikode, Munich, Tokyo, Wayanad, France, Kerala)",
+                        key="loc_search_query"
                     )
+                with c_s2:
+                    all_cats = ["All Categories"] + sorted(list({l.get("category", "") for l in unique_loc_list if l.get("category")}))
+                    selected_cat = st.selectbox("Filter by Category:", all_cats, key="loc_filter_cat")
+
+                # Real-time search filtering
+                q = search_query.strip().lower() if search_query else ""
+                matching_locations = []
+                for loc in unique_loc_list:
+                    if selected_cat != "All Categories" and loc.get("category") != selected_cat:
+                        continue
+                    if not q:
+                        matching_locations.append(loc)
+                    else:
+                        search_haystack = f"{loc['name']} {loc.get('country', '')} {loc.get('region', '')} {loc.get('category', '')} {loc.get('prompt', '')}".lower()
+                        if q in search_haystack:
+                            matching_locations.append(loc)
+
+                if not matching_locations:
+                    st.warning(f"❌ No existing location matches **'{search_query}'**.")
+                    st.info("💡 To keep the database clean and prevent duplicate entries, check your search spelling. If this place is genuinely not in the database, choose **'➕ No, register a new location'** above.")
                 else:
-                    # 2. Similar / Substring match check
-                    similar_matches = [
-                        l for l in unique_loc_list
-                        if clean_input in l["name"].strip().lower() or l["name"].strip().lower() in clean_input
-                    ]
-                    if similar_matches:
-                        similar_names = [f"**'{l['name']}'**" for l in similar_matches[:3]]
-                        st.info(
-                            f"💡 **Similar place found in database:** {', '.join(similar_names)}.\n\n"
-                            f"If this is the same place, please choose **'🔍 No, choose from available options'** above to avoid creating a duplicate entry."
+                    st.caption(f"Showing **{len(matching_locations)}** matching location(s) out of {len(unique_loc_list)} total places:")
+
+                    # Build options map with rich informative labels
+                    option_map = {}
+                    for loc in matching_locations:
+                        driving_str = "🚗 Driving: Left" if loc.get("driving_side") == "Left" else "🚙 Driving: Right"
+                        country_info = f" | {loc.get('country', '')}" if loc.get('country') else ""
+                        label = f"📍 {loc['name']} — [{loc.get('category', 'Place')}{country_info} | {driving_str}]"
+                        option_map[label] = loc
+
+                    chosen_label = st.selectbox(
+                        "Select correct location from matching results:",
+                        options=list(option_map.keys()),
+                        key="selected_loc_dropdown"
+                    )
+
+                    matched_loc = option_map[chosen_label]
+                    target_name = matched_loc["name"]
+                    reg_country = matched_loc.get("country", "")
+                    reg_region = matched_loc.get("region", "")
+                    reg_category = matched_loc.get("category", "")
+                    reg_driving = matched_loc.get("driving_side", "Left")
+                    descriptors = ""
+
+                    # Display card confirming selection & duplicate prevention guarantee
+                    st.markdown(
+                        f"<div style='background:rgba(0, 255, 163, 0.08); border:1px solid rgba(0, 255, 163, 0.28); border-left:4px solid #00FFA3; padding:12px 16px; border-radius:12px; margin:8px 0 12px 0; box-shadow:0 0 20px rgba(0, 255, 163, 0.12);'>"
+                        f"<b style='color:#FFFFFF; font-family:var(--font-display);'>Selected Target:</b> <span style='color:#00F0FF; font-weight:600;'>{matched_loc['name']}</span><br/>"
+                        f"<span style='color:var(--hud-text-secondary); font-size:0.88rem;'>Category: <code style='background:rgba(0, 240, 255, 0.12); color:#00F0FF; border:1px solid rgba(0, 240, 255, 0.3);'>{reg_category}</code> | Country: <b style='color:#FFFFFF;'>{reg_country}</b> | Region: <b style='color:#FFFFFF;'>{reg_region}</b> | Driving: <b style='color:#00FFA3;'>{reg_driving}</b></span><br/>"
+                        f"<span style='color:#00FFA3; font-size:0.82rem; font-weight:600; font-family:var(--font-mono);'>🛡️ Duplicate Protection Active: Updates existing place in-place without duplicating.</span>"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
+
+            else:
+                st.markdown("##### ➕ Register a New Location")
+                target_name = st.text_input(
+                    "Exact Place Name:",
+                    placeholder="e.g. Kozhencherry, Pathanamthitta, Kerala, India",
+                    help="Enter the canonical name for this place."
+                )
+
+                # Active Duplicate Detection & Warning
+                if target_name and target_name.strip():
+                    clean_input = target_name.strip().lower()
+                
+                    # 1. Exact match check
+                    exact_dup = next((l for l in unique_loc_list if l["name"].strip().lower() == clean_input), None)
+                    if exact_dup:
+                        st.warning(
+                            f"⚠️ **Duplicate Alert:** '{exact_dup['name']}' already exists in the database!\n\n"
+                            f"Retraining with this name will update the existing location in-place, preventing any duplicate entries."
+                        )
+                    else:
+                        # 2. Similar / Substring match check
+                        similar_matches = [
+                            l for l in unique_loc_list
+                            if clean_input in l["name"].strip().lower() or l["name"].strip().lower() in clean_input
+                        ]
+                        if similar_matches:
+                            similar_names = [f"**'{l['name']}'**" for l in similar_matches[:3]]
+                            st.info(
+                                f"💡 **Similar place found in database:** {', '.join(similar_names)}.\n\n"
+                                f"If this is the same place, please choose **'🔍 No, choose from available options'** above to avoid creating a duplicate entry."
+                            )
+
+                descriptors = st.text_input(
+                    "Visual clues (soil, flora, roads, architecture, signage):",
+                    placeholder="e.g. red laterite soil, rubber plantations, Malayalam shop boards, white roadside bollards"
+                )
+                c_a, c_b, c_c = st.columns(3)
+                with c_a:
+                    reg_country = st.text_input("Country:", value="India")
+                with c_b:
+                    reg_region = st.text_input("State / Region:", value="Kerala")
+                with c_c:
+                    reg_driving = st.selectbox("Driving Side:", ["Left", "Right"])
+                reg_category = "User Added"
+
+            train_btn = st.button("🧠 Retrain Model on this Image", type="secondary", use_container_width=True)
+
+            if train_btn:
+                if not target_name or target_name.strip() == "":
+                    st.warning("Please specify or select a location name.")
+                else:
+                    old_top_name = top_pick["name"]
+                    with st.spinner(f"Updating visual memory and text embeddings for '{target_name}'..."):
+                        new_embeddings, new_locations, corrections, was_added = apply_user_correction(
+                            st.session_state["last_image"],
+                            target_name.strip(),
+                            descriptors.strip() if descriptors else "",
+                            reg_country.strip() if reg_country else "",
+                            reg_region.strip() if reg_region else "",
+                            reg_category,
+                            reg_driving,
+                            text_embeddings,
+                            locations,
+                            corrections
                         )
 
-            descriptors = st.text_input(
-                "Visual clues (soil, flora, roads, architecture, signage):",
-                placeholder="e.g. red laterite soil, rubber plantations, Malayalam shop boards, white roadside bollards"
-            )
-            c_a, c_b, c_c = st.columns(3)
-            with c_a:
-                reg_country = st.text_input("Country:", value="India")
-            with c_b:
-                reg_region = st.text_input("State / Region:", value="Kerala")
-            with c_c:
-                reg_driving = st.selectbox("Driving Side:", ["Left", "Right"])
-            reg_category = "User Added"
+                        # Immediately re-evaluate the image with updated memory
+                        new_ranked, new_emb = predict_location(
+                            st.session_state["last_image"],
+                            new_embeddings,
+                            new_locations,
+                            corrections_list=corrections,
+                            category_filter=selected_scope
+                        )
 
-        train_btn = st.button("🧠 Retrain Model on this Image", type="secondary", use_container_width=True)
-
-        if train_btn:
-            if not target_name or target_name.strip() == "":
-                st.warning("Please specify or select a location name.")
-            else:
-                old_top_name = top_pick["name"]
-                with st.spinner(f"Updating visual memory and text embeddings for '{target_name}'..."):
-                    new_embeddings, new_locations, corrections, was_added = apply_user_correction(
-                        st.session_state["last_image"],
-                        target_name.strip(),
-                        descriptors.strip() if descriptors else "",
-                        reg_country.strip() if reg_country else "",
-                        reg_region.strip() if reg_region else "",
-                        reg_category,
-                        reg_driving,
-                        text_embeddings,
-                        locations,
-                        corrections
-                    )
-
-                    # Immediately re-evaluate the image with updated memory
-                    new_ranked, new_emb = predict_location(
-                        st.session_state["last_image"],
-                        new_embeddings,
-                        new_locations,
-                        corrections_list=corrections,
-                        category_filter=selected_scope
-                    )
-
-                    st.session_state["ranked"] = new_ranked
-                    st.session_state["image_embedding"] = new_emb
-                    action_text = "Registered new location" if was_added else "Updated existing location in-place (no duplicate)"
-                    st.session_state["just_corrected"] = {
-                        "old": old_top_name,
-                        "new": new_ranked[0]["name"],
-                        "conf": new_ranked[0]["confidence"],
-                        "action": action_text
-                    }
-                    st.rerun()
+                        st.session_state["ranked"] = new_ranked
+                        st.session_state["image_embedding"] = new_emb
+                        action_text = "Registered new location" if was_added else "Updated existing location in-place (no duplicate)"
+                        st.session_state["just_corrected"] = {
+                            "old": old_top_name,
+                            "new": new_ranked[0]["name"],
+                            "conf": new_ranked[0]["confidence"],
+                            "action": action_text
+                        }
+                        st.rerun()
 
     elif image is not None:
         st.info("💡 **Photo loaded!** Click **'📍 Geoguess & Analyze Location'** on the left to run multi-scale vision inference.")
