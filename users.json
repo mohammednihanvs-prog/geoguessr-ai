@@ -1,20 +1,20 @@
 {
   "GeoPro": {
     "password_hash": "33d7d8c65330595595b93c673d2534e3274185708e8552759ae1015d2706bd61",
-    "total_score": 13850,
+    "total_score": 14.8,
     "rounds_played": 3,
     "wins": 3,
     "losses": 0,
-    "best_round_score": 4980,
-    "best_distance_km": 8.2
+    "best_round_score": 5.0,
+    "best_distance_km": 4.2
   },
   "GlobeTrotter": {
     "password_hash": "df42f46a517e4e9577c7a680723a2a55f5dc34bb5dfc4d7000420b040e21328a",
-    "total_score": 9420,
+    "total_score": 9.4,
     "rounds_played": 3,
     "wins": 2,
     "losses": 1,
-    "best_round_score": 4850,
+    "best_round_score": 4.8,
     "best_distance_km": 64.5
   }
 }

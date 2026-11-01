@@ -1805,14 +1805,14 @@ def record_player_round(username, round_score, won, distance_km):
     if username not in users:
         return
     user = users[username]
-    user["total_score"] = user.get("total_score", 0) + round_score
+    user["total_score"] = round(user.get("total_score", 0.0) + round_score, 1)
     user["rounds_played"] = user.get("rounds_played", 0) + 1
     if won:
         user["wins"] = user.get("wins", 0) + 1
     else:
         user["losses"] = user.get("losses", 0) + 1
-    if round_score > user.get("best_round_score", 0):
-        user["best_round_score"] = round_score
+    if round_score > user.get("best_round_score", 0.0):
+        user["best_round_score"] = round(round_score, 1)
     best_d = user.get("best_distance_km")
     if best_d is None or distance_km < best_d:
         user["best_distance_km"] = round(distance_km, 1)
@@ -1845,10 +1845,16 @@ def calculate_haversine(lat1, lon1, lat2, lon2):
     return R * c
 
 def compute_geoguessr_score(dist_km):
-    if dist_km <= 0.05:
-        return 5000
-    score = int(round(5000.0 * math.exp(-dist_km / 2000.0)))
-    return max(0, min(5000, score))
+    """
+    Precision 5-point scale per image:
+    - Guesses under 5 km receive the maximum 5.0 / 5.0 score (Bullseye!).
+    - Points smoothly scale down with distance error (minimum 0.0, maximum 5.0).
+    """
+    if dist_km <= 5.0:
+        return 5.0
+    # Smooth exponential decay based on distance error
+    score = 5.0 * math.exp(-(dist_km - 5.0) / 1200.0)
+    return max(0.0, min(5.0, round(score, 1)))
 
 def render_geoguessr_game():
     # Session state initialization
@@ -1891,7 +1897,7 @@ def render_geoguessr_game():
                 with c_p1:
                     st.success(f"🎮 Active Player: **{current_player}**")
                 with c_p2:
-                    st.metric("Total Profile Score", f"{curr_u_data.get('total_score', 0):,} pts")
+                    st.metric("Total Profile Score", f"{curr_u_data.get('total_score', 0.0):.1f} pts")
                 with c_p3:
                     st.metric("Record", f"{curr_u_data.get('wins', 0)}W - {curr_u_data.get('losses', 0)}L")
                 with c_p4:
@@ -1949,30 +1955,19 @@ def render_geoguessr_game():
         # Top Control & Scoreboard Bar
         score_c1, score_c2, score_c3, score_c4 = st.columns([1, 1, 1.2, 1.2])
         with score_c1:
-            st.metric("👤 Your Session Score", f"{st.session_state['game_user_score']:,} pts")
+            st.metric("👤 Your Session Score", f"{st.session_state['game_user_score']:.1f} pts")
         with score_c2:
-            st.metric("🤖 AI Session Score", f"{st.session_state['game_ai_score']:,} pts")
+            st.metric("🤖 AI Session Score", f"{st.session_state['game_ai_score']:.1f} pts")
         with score_c3:
             st.metric("🏆 Battle Score", f"{st.session_state['game_user_wins']}W - {st.session_state['game_ai_wins']}L ({st.session_state['game_rounds']} Rounds)")
         with score_c4:
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
-                if st.button("🎲 Deal New", use_container_width=True, help="Deal a new mystery challenge image"):
-                    st.session_state["game_current_img"] = random.choice(game_files)
-                    st.session_state["game_round_finished"] = False
-                    st.session_state["game_last_result"] = None
-                    st.session_state["game_round_id"] += 1
-                    st.rerun()
-            with col_b2:
-                if st.button("🔄 Reset", use_container_width=True, help="Reset tournament session score"):
-                    st.session_state["game_rounds"] = 0
-                    st.session_state["game_user_score"] = 0
-                    st.session_state["game_ai_score"] = 0
-                    st.session_state["game_user_wins"] = 0
-                    st.session_state["game_ai_wins"] = 0
-                    st.session_state["game_round_finished"] = False
-                    st.session_state["game_last_result"] = None
-                    st.rerun()
+            st.write("")
+            if st.button("🎲 Deal New Mystery Image", use_container_width=True, help="Deal a new mystery challenge image"):
+                st.session_state["game_current_img"] = random.choice(game_files)
+                st.session_state["game_round_finished"] = False
+                st.session_state["game_last_result"] = None
+                st.session_state["game_round_id"] += 1
+                st.rerun()
 
         st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
         col_g_left, col_g_right = st.columns([1, 1], gap="medium")
@@ -1982,7 +1977,7 @@ def render_geoguessr_game():
             img_path = os.path.join(GAME_IMAGES_DIR, current_file)
             try:
                 g_img = Image.open(img_path).convert("RGB")
-                st.image(g_img, use_container_width=True, caption=f"Mystery Scene: {current_file}")
+                st.image(g_img, use_container_width=True, caption="🕵️ Mystery Street View Scene — Guess the location")
             except Exception as e:
                 st.error(f"Error opening image: {e}")
                 g_img = None
@@ -2148,7 +2143,7 @@ def render_geoguessr_game():
                         <h4 style="margin: 0; color: #60a5fa;">👤 {player_disp}</h4>
                         <p style="margin: 4px 0 0 0; font-size: 0.88rem;">Guess: <b>{res['user_label']}</b></p>
                         <p style="margin: 4px 0 0 0; font-size: 0.95rem;">Distance Error: <b>{res['user_dist']:.1f} km</b></p>
-                        <p style="margin: 4px 0 0 0; font-size: 1.15rem; color: #93c5fd;"><b>+{res['user_score']:,} pts</b></p>
+                        <p style="margin: 4px 0 0 0; font-size: 1.15rem; color: #93c5fd;"><b>+{res['user_score']:.1f} / 5.0 pts</b></p>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -2158,7 +2153,7 @@ def render_geoguessr_game():
                         <h4 style="margin: 0; color: #f87171;">🤖 StreetCLIP AI</h4>
                         <p style="margin: 4px 0 0 0; font-size: 0.88rem;">Guess: <b>{res['ai_name']}</b></p>
                         <p style="margin: 4px 0 0 0; font-size: 0.95rem;">Distance Error: <b>{res['ai_dist']:.1f} km</b> ({res['ai_conf']*100:.1f}%)</p>
-                        <p style="margin: 4px 0 0 0; font-size: 1.15rem; color: #fca5a5;"><b>+{res['ai_score']:,} pts</b></p>
+                        <p style="margin: 4px 0 0 0; font-size: 1.15rem; color: #fca5a5;"><b>+{res['ai_score']:.1f} / 5.0 pts</b></p>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -2279,11 +2274,11 @@ def render_geoguessr_game():
                 leaderboard_data.append({
                     "Rank": f"{badge}#{rank}",
                     "Player": p_name,
-                    "Total Points": f"{p_stats.get('total_score', 0):,} pts",
+                    "Total Points": f"{p_stats.get('total_score', 0.0):.1f} pts",
                     "Matches": rounds,
                     "Wins": wins,
                     "Win Rate": win_rate,
-                    "Best Round": f"{p_stats.get('best_round_score', 0):,} pts",
+                    "Best Round": f"{p_stats.get('best_round_score', 0.0):.1f} / 5.0 pts",
                     "Closest Pin": best_d
                 })
 
